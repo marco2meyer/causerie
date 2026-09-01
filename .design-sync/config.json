@@ -1,0 +1,52 @@
+{
+  "projectId": "8b219cc0-2905-45c4-b2b4-cc80be930c2d",
+  "shape": "package",
+  "pkg": "causerie-ds",
+  "globalName": "Causerie",
+  "entry": ".design-sync/ds-pkg/dist/ds.js",
+  "buildCmd": "node .design-sync/ds-pkg/build.mjs",
+  "srcDir": "../../src",
+  "cssEntry": "dist/styles.css",
+  "extraFonts": [
+    "../../node_modules/@fontsource-variable/inter/index.css",
+    "../../node_modules/@fontsource-variable/space-grotesk/index.css",
+    "dist/fonts-alias.css"
+  ],
+  "componentSrcMap": {
+    "Odile": "../../src/components/Avatar.tsx",
+    "I": null,
+    "Ladder": "../../src/components/charts.tsx",
+    "HistoryChart": "../../src/components/charts.tsx"
+  },
+  "overrides": {
+    "SheetView": {
+      "cardMode": "single",
+      "primaryStory": "OneSheet"
+    },
+    "Toast": {
+      "cardMode": "single",
+      "primaryStory": "Confirmation"
+    },
+    "Tutorial": {
+      "cardMode": "single",
+      "primaryStory": "FirstSlideFrench"
+    },
+    "Odile": {
+      "cardMode": "column"
+    },
+    "HistoryChart": {
+      "cardMode": "column"
+    },
+    "RankMark": {
+      "cardMode": "column"
+    },
+    "SpeakBtn": {
+      "cardMode": "column"
+    },
+    "Ladder": {
+      "cardMode": "column"
+    }
+  },
+  "docsDir": "../docs",
+  "readmeHeader": ".design-sync/conventions.md"
+}

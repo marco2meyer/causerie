@@ -1,0 +1,29 @@
+node_modules/
+dist/
+dist-single/
+.netlify/
+*.log
+.DS_Store
+tests/e2e/shots/
+.env
+.env.*
+# …but the template that says WHICH variables to set carries no values and belongs in the
+# repo; without this the blanket rule above hides it and the tooling looks undocumented.
+!.env.example
+
+# scratch that must never be committed: the bridge that writes into this checkout cannot
+# delete, so it moves files aside into _to_delete/, and git bundles get passed around to
+# move work between machines. A blanket `git add -A` swept both into a commit once.
+_to_delete/
+*.bundle
+
+# design-sync (claude.ai/design) working files
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.design-sync/ds-pkg/dist/
+
+# Netlify CLI edge-bundler artifact, written by `netlify deploy --build`
+deno.lock

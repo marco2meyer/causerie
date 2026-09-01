@@ -1,0 +1,10 @@
+{
+  "//": "Preview cards compile with esbuild's React automatic runtime. Without this, esbuild walks up to the repo tsconfig (jsxImportSource: \"preact\") and the previews emit Preact vnodes React refuses to render. Preview files therefore use React idioms: className, object style.",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "target": "ES2021",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true
+  }
+}

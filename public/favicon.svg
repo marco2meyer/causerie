@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <!-- Odile, the tutor, as the app mark: static pose of src/components/Avatar.tsx,
+       cropped to the face, on her own blue field (La Troupe). -->
+  <defs>
+    <clipPath id="r"><rect width="240" height="240" rx="52"/></clipPath>
+  </defs>
+  <g clip-path="url(#r)">
+    <rect width="240" height="240" fill="#2F5BE8"/>
+    <g transform="translate(-24 -14) scale(1.2)">
+      <path d="M46 240 Q48 178 120 176 Q192 178 194 240 Z" fill="#17233D"/>
+      <rect x="106" y="150" width="28" height="34" rx="10" fill="#E8B48C"/>
+      <path d="M64 78 Q64 34 120 34 Q176 34 176 78 L176 150 Q176 176 120 176 Q64 176 64 150 Z" fill="#17233D"/>
+      <rect x="74" y="66" width="92" height="92" rx="26" fill="#F2C29E"/>
+      <path d="M64 96 Q60 40 120 38 Q180 40 176 96 L176 84 Q168 62 120 60 Q72 62 64 84 Z" fill="#101A2E"/>
+      <ellipse cx="118" cy="42" rx="52" ry="17" fill="#F0552F" transform="rotate(-6 118 42)"/>
+      <circle cx="118" cy="27" r="4.5" fill="#C93A20"/>
+      <rect x="86" y="94" width="22" height="4.6" rx="2.3" fill="#101A2E"/>
+      <rect x="132" y="94" width="22" height="4.6" rx="2.3" fill="#101A2E"/>
+      <ellipse cx="97" cy="112" rx="10.5" ry="8" fill="#FFFFFF"/>
+      <ellipse cx="143" cy="112" rx="10.5" ry="8" fill="#FFFFFF"/>
+      <circle cx="98" cy="113" r="4" fill="#101A2E"/>
+      <circle cx="144" cy="113" r="4" fill="#101A2E"/>
+      <path d="M86 110.5 q11 -5 22 0 l0 -12.5 q-11 -4 -22 0 Z" fill="#F2C29E"/>
+      <path d="M132 110.5 q11 -5 22 0 l0 -12.5 q-11 -4 -22 0 Z" fill="#F2C29E"/>
+      <path d="M86.5 110.5 q11 -5 21 0" fill="none" stroke="#101A2E" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M132.5 110.5 q11 -5 21 0" fill="none" stroke="#101A2E" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M119 118 q4 7 -1 12" fill="none" stroke="#D9A175" stroke-width="3" stroke-linecap="round"/>
+      <path d="M109 147 q11 4.5 22 0" fill="none" stroke="#5E2B38" stroke-width="3.4" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

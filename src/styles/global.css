@@ -1,0 +1,668 @@
+/* ============ Causerie — La Troupe ============
+   Direction C of the design system: flat colour blocks, hard ink borders, speech
+   bubbles, Odile at full size. A daily scene with a person who remembers you — so a
+   wrong sentence is a panel rather than a red error state.
+
+   LIGHT ONLY. The palette assumes the cream ground; there is no theme provider, no
+   dark variant and no media query for one. Five colours do all the work:
+
+     cream   the page
+     paper   a panel raised off it
+     ink     text, and every border worth seeing
+     blue    Odile — her voice, her corrections, anything addressed to you
+     tomato  the one action on the screen, and the mark on what changed
+     jaune   what came out of it: an answer, a card, a thing you got right
+
+   Never hard-code a hex outside this file: everything below is a token. */
+:root{
+  --cream:#FFF3E3; --paper:#FFF9EE; --sand:#F7EDDC; --sand2:#EFE1CA;
+  --bg0:#FFF3E3; --bg1:#FFF9EE; --bg2:#F7EDDC; --bg3:#EFE1CA;
+  /* hairlines for dividers INSIDE a panel; the panel's own edge is --edge at --bw */
+  --line:rgba(23,35,61,.16); --line2:rgba(23,35,61,.34);
+  --edge:#17233D; --bw:2.5px; --bw2:2px;
+  --ink:#17233D; --ink2:#5C6580; --ink3:#7A8296; --ink-deep:#101A2E;
+  /* the brand action. --rose is kept as the token name the whole app already speaks. */
+  --rose:#F0552F; --rose-deep:#D4431F; --rose-soft:rgba(240,85,47,.14);
+  --tomato:#F0552F;
+  /* tomato is a fill first: as INK on a light ground it needs to go a shade deeper, and
+     #C93A20 is already in the palette (the stalk of her beret) */
+  --tomato-deep:#C93A20;
+  --blue:#2F5BE8; --blue-deep:#2447BC; --chart:#2F5BE8; --blue-soft:rgba(47,91,232,.12);
+  /* success, in this system, is yellow: what fell out of the call and what you got right */
+  --jaune:#FFC93D; --jaune-ink:#6B4E00; --jaune-soft:rgba(255,201,61,.28);
+  /* A sixth and seventh fill, and the only two: the review card wears the gender of the
+     word on it. Not a new idea in this app — the picture prompts have always dressed a
+     feminine noun as a queen in RED and a masculine one as a king in BLUE (lib/imagegen),
+     so these are those two conventions as a flat fill, and they are used nowhere else.
+     Pitched at the same lightness as --jaune on purpose: the card has to read as the same
+     object in three moods rather than three different components, and every text colour
+     already sitting on it — the ink, the kicker, the tomato answer — has to keep working
+     against all three. */
+  --bleu-card:#BAD0FF; --bleu-card-ink:#22397F;
+  --rose-card:#FFC2D3; --rose-card-ink:#8A2444;
+  /* --teal is the app's word for "this went well". In a five-colour system that is the
+     yellow family, and text has to use its ink rather than the fill. */
+  --teal:#6B4E00; --teal-soft:rgba(255,201,61,.28);
+  /* Odile's own colour: tips, ranks and anything spoken in her voice */
+  --purple:#2F5BE8; --purple-soft:rgba(47,91,232,.12);
+  /* "watch this" and "this is destructive": both tomato in spirit, both a shade deeper
+     than the fill so that 11px of them is still readable on cream */
+  --amber:#A85A0A; --amber-soft:rgba(240,85,47,.14);
+  --red:#B8330C;
+  --grid:rgba(23,35,61,.10); --axis:rgba(23,35,61,.28);
+  --r:20px; --r-sm:14px;
+  --disp:"Bricolage Grotesque Variable","Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Figtree Variable","Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  /* flat system: the only shadow is under something genuinely floating */
+  --shadow:0 18px 44px rgba(23,35,61,.18);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg0);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{min-height:100dvh}
+#app{min-height:100dvh;display:flex;flex-direction:column}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;padding:0}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+input,select,textarea{font-family:inherit;color:var(--ink);background:var(--paper);border:var(--bw2) solid var(--line2);border-radius:var(--r-sm);padding:11px 13px;font-size:15px;outline:none;width:100%;font-weight:500}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+::placeholder{color:var(--ink3)}
+a{color:var(--blue);text-decoration:none}
+a:hover{color:var(--tomato)}
+h1,h2,h3{font-family:var(--disp);font-weight:800;letter-spacing:-.015em;margin:0;text-wrap:pretty}
+.muted{color:var(--ink2)} .tiny{font-size:12.5px;color:var(--ink3);font-weight:500}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+/* the kicker: every panel in La Troupe says what it is, in small caps above itself */
+.kicker,.section-t,.rev-type,.wg-kicker,.daycard .kicker{font-size:10.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--ink3);font-family:var(--body)}
+
+/* layout */
+.shell{display:flex;flex-direction:column;min-height:100dvh;max-width:1160px;margin:0 auto;width:100%}
+.main{flex:1;padding:calc(14px + env(safe-area-inset-top)) 20px calc(78px + env(safe-area-inset-bottom));width:100%}
+@media(min-width:900px){
+  .shell{flex-direction:row}
+  .main{padding:34px 40px 60px}
+}
+
+/* nav — cream, hard ink rule on top, the live tab in tomato */
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:50;display:flex;justify-content:space-around;gap:2px;
+  background:var(--cream);border-top:var(--bw2) solid var(--edge);padding:7px 8px calc(7px + env(safe-area-inset-bottom))}
+.nav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--ink3);padding:6px 12px;border-radius:12px;letter-spacing:0}
+.nav button svg{width:20px;height:20px}
+.nav button.on{color:var(--tomato)}
+@media(min-width:900px){
+  .nav{position:sticky;top:0;bottom:auto;height:100dvh;flex-direction:column;justify-content:flex-start;gap:4px;
+    border-top:none;border-right:var(--bw2) solid var(--edge);padding:26px 14px;width:200px;background:var(--cream)}
+  .nav .brand{margin-bottom:22px}
+  .nav button{flex-direction:row;gap:11px;font-size:14.5px;width:100%;padding:11px 14px;justify-content:flex-start}
+}
+.brand{font-family:var(--disp);font-weight:800;font-size:20px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;padding:4px 6px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--tomato)}
+@media(max-width:899px){.nav .brand{display:none}}
+
+/* cards — paper inside a hard ink edge */
+/* `color` is not decoration here: a panel that sets its own background inherits its TEXT
+   colour from whatever it is laid over, and the call screen is cream on blue. That is how
+   the cheat sheet came to render cream on cream — the grammar was on screen the whole
+   time, in the one colour that made it invisible. Every surface states both. */
+.card{background:var(--paper);color:var(--ink);border:var(--bw) solid var(--edge);border-radius:var(--r);padding:18px}
+.card+.card{margin-top:14px}
+.section-t{margin:26px 2px 10px}
+.row{display:flex;align-items:center;gap:10px}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:700px){.grid2{grid-template-columns:1fr 1fr}}
+
+/* buttons — flat blocks, no gradient, no glow */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--r-sm);padding:12px 20px;font-weight:700;font-size:15px;transition:transform .06s ease,opacity .15s;border:var(--bw2) solid transparent;text-align:left}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--tomato);color:var(--cream);font-family:var(--disp);font-weight:800;letter-spacing:-.01em;border-color:var(--tomato)}
+.btn.ghost{background:transparent;border-color:var(--edge);color:var(--ink);border-width:var(--bw)}
+.btn.subtle{background:transparent;border-color:var(--line2);color:var(--ink2)}
+.btn.danger{background:transparent;border-color:var(--tomato);color:var(--tomato);border-width:var(--bw)}
+.btn.big{width:100%;padding:17px 20px;font-size:19px;border-radius:var(--r);font-family:var(--disp);font-weight:800}
+.btn.big.subtle,.btn.big.ghost{font-family:var(--disp)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn svg{width:18px;height:18px;flex-shrink:0}
+.nt svg{width:12px;height:12px;flex-shrink:0}
+.chip svg{width:13px;height:13px;flex-shrink:0}
+.iconbtn{width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:var(--bw2) solid var(--edge);color:var(--ink)}
+/* the signature call-to-action: a label, and on the right what it will cost you */
+.cta{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+  border-radius:var(--r);padding:15px 19px;background:var(--tomato);color:var(--cream);
+  font-family:var(--disp);font-weight:800;font-size:21px;letter-spacing:-.015em;border:var(--bw) solid var(--tomato);
+  transition:transform .06s ease}
+.cta:active{transform:scale(.98)}
+.cta .meta{font-family:var(--body);font-weight:700;font-size:13px;opacity:.92;flex-shrink:0}
+.cta.quiet{background:transparent;color:var(--ink);border-color:var(--edge)}
+.cta.ink{background:var(--ink);color:var(--cream);border-color:var(--ink)}
+.cta.solo{justify-content:center;text-align:center}
+.cta:disabled{opacity:.4;cursor:default}
+.cta svg{width:20px;height:20px;flex-shrink:0}
+
+/* chips — outlined by default, filled when they carry a colour */
+.chip{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:999px;background:transparent;border:var(--bw2) solid var(--edge);font-size:12.5px;font-weight:700;color:var(--ink);min-height:38px}
+.chip.rose{background:var(--tomato);border-color:var(--tomato);color:var(--cream)}
+.chip.blue,.chip.purple{background:var(--blue);border-color:var(--blue);color:var(--cream)}
+.chip.teal,.chip.amber{background:var(--jaune);border-color:var(--jaune);color:var(--ink)}
+.chip.sm{padding:5px 11px;font-size:11.5px;min-height:28px;border-width:1.5px}
+.lvl{font-family:var(--disp);font-weight:800;font-size:11.5px;letter-spacing:.02em;padding:5px 9px;border-radius:20px;background:var(--jaune);color:var(--ink);border:none}
+
+/* topic cards */
+.topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+@media(min-width:700px){.topics{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}}
+.topic{position:relative;text-align:left;background:var(--paper);border:var(--bw) solid var(--edge);border-radius:var(--r);padding:16px;transition:transform .1s;display:flex;flex-direction:column;gap:9px;min-height:118px}
+.topic:hover{transform:translateY(-1px)}
+.topic.sel{background:var(--jaune)}
+.topic .t{font-weight:700;font-size:15.5px;line-height:1.3}
+.topic .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:auto}
+.topic .tags span{font-size:10.5px;color:var(--ink3);background:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600}
+
+/* stage — the plain centred screen (boot, analysing, the failed analysis) */
+.stage{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));background:var(--cream)}
+/* the call: Odile's own screen, blue edge to edge */
+.stage.call{background:var(--blue);color:var(--cream);justify-content:flex-start;padding:0;overflow:hidden}
+.callhead{position:absolute;left:20px;right:20px;top:calc(22px + env(safe-area-inset-top));display:flex;justify-content:space-between;align-items:center;gap:10px;z-index:3}
+.calltopic{background:rgba(255,243,227,.2);border-radius:20px;padding:7px 13px;font-size:12px;font-weight:700;color:var(--cream);
+  max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calltimer{font-family:var(--disp);font-weight:800;font-size:17px;color:var(--jaune);flex-shrink:0}
+.avatar-wrap{position:relative;width:min(52vw,210px);aspect-ratio:1;margin:calc(58px + env(safe-area-inset-top)) auto 0;flex-shrink:0}
+.avatar-disc{position:absolute;inset:0;overflow:hidden}
+.aura{display:none}
+.callname{font-family:var(--disp);font-weight:800;font-size:20px;color:var(--cream);text-align:center;margin-top:2px}
+.callstate{color:rgba(255,243,227,.72);font-size:13px;font-weight:600;margin-top:3px;min-height:18px;text-align:center}
+/* on hold: she is dimmed and the yellow clock greys out, so a timer that has stopped
+   moving reads as a call that is waiting rather than one that has died */
+.stage.call.onhold .avatar-disc{opacity:.4;filter:saturate(.35);transition:opacity .3s,filter .3s}
+.stage.call.onhold .calltimer{color:rgba(255,243,227,.45)}
+.stage.call.onhold .callstate{color:var(--jaune)}
+.pausednote{color:rgba(255,243,227,.6);font-size:12px;font-weight:600;margin-top:4px;text-align:center;padding:0 20px}
+.focus-strip{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;width:min(94vw,620px);margin:12px auto 0;padding:0 16px}
+.stage.call .chip{border-color:rgba(255,243,227,.34);color:var(--cream);background:rgba(255,243,227,.14)}
+.stage.call .matbtn{border-color:rgba(255,243,227,.34);color:var(--cream);background:rgba(255,243,227,.14)}
+/* the aide-mémoire panel, low on the call screen */
+.callsheet{position:absolute;left:20px;right:20px;bottom:calc(126px + env(safe-area-inset-bottom));background:rgba(255,243,227,.14);border-radius:16px;padding:12px 15px;z-index:2}
+.callsheet .kicker{color:var(--jaune)}
+.callbar{position:absolute;bottom:calc(30px + env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:min(22px,4vw);align-items:flex-start;z-index:3}
+.callbtn{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,243,227,.16);color:var(--cream);border:none;transition:transform .08s}
+.callbtn:active{transform:scale(.93)}
+.callbtn.end{width:74px;height:74px;background:var(--tomato);color:var(--cream);font-family:var(--disp);font-weight:800;font-size:16px;touch-action:pan-y;position:relative;z-index:1}
+.callbtn.on{background:var(--jaune);color:var(--ink)}
+/* a control the call has nothing to do with right now (the mic while on hold, the turn
+   button while she is thinking) stays where it is and stops answering */
+.callbtn:disabled{opacity:.4}
+.cbtn{display:flex;flex-direction:column;align-items:center;gap:6px}
+.blabel{font-size:10.5px;font-weight:700;color:rgba(255,243,227,.7);letter-spacing:.02em}
+/* the stop control: a tap holds the call, a drag along the rail ends it. The rail is only
+   drawn once a finger is on the button, so the resting state stays one round button. */
+.endrail{position:relative;display:flex;align-items:center;justify-content:center;width:74px;height:74px}
+.endrail-x{position:absolute;right:-2px;top:50%;transform:translateY(-50%);width:20px;display:inline-flex;color:rgba(255,243,227,.55);pointer-events:none}
+.endrail.armed .endrail-x{color:var(--cream)}
+.callbtn.end.dragging{transition:none}
+.callbtn.end.held{background:var(--jaune);color:var(--ink)}
+.endrail.armed .callbtn.end{background:var(--tomato-deep)}
+/* live captions: her line in cream, yours in ink — the same two bubbles as the debrief */
+.captions{position:absolute;left:0;right:0;bottom:calc(196px + env(safe-area-inset-bottom));top:auto;
+  max-height:30vh;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:9px;padding:0 20px;pointer-events:none;z-index:2;
+  transition:opacity .45s ease}
+/* asked for, then let go of: her line fades once she has finished saying it */
+.captions.gone{opacity:0}
+.cap{font-size:17px;line-height:1.32;padding:13px 15px;text-wrap:pretty}
+.cap.tutor{align-self:flex-start;background:var(--cream);color:var(--ink);border-radius:20px 20px 20px 4px;margin-right:32px;font-family:var(--disp);font-weight:600}
+.cap.me{align-self:flex-end;background:var(--ink);color:#B9C4DC;border-radius:20px 20px 4px 20px;margin-left:32px}
+
+/* transcript / review */
+.convo{display:flex;flex-direction:column;gap:12px}
+.turn{display:flex;gap:10px;align-items:flex-end}
+.turn.me{flex-direction:row-reverse}
+.pfp{width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--blue);display:flex;align-items:flex-end}
+.pfp.me{display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:var(--ink);color:var(--cream)}
+.bubblecol{display:flex;flex-direction:column;gap:0;max-width:78%}
+.bubble{padding:12px 15px;border-radius:20px 20px 20px 4px;font-size:16px;line-height:1.4;background:var(--paper);border:var(--bw2) solid var(--edge);text-wrap:pretty}
+.turn.me .bubble{background:var(--ink);border-color:var(--ink);color:#B9C4DC;border-radius:20px 20px 4px 20px}
+.note{border-radius:0 0 16px 16px;margin-top:-2px;padding:12px 15px;font-size:14px;line-height:1.5;border:var(--bw2) solid var(--edge)}
+.turn.me .bubble.hasnote{border-radius:20px 20px 0 0}
+/* her correction speaks in her colour; what you got right comes out in yellow */
+.note.tip{background:var(--blue);border-color:var(--blue);color:var(--cream)}
+.note.praise{background:var(--jaune);border-color:var(--jaune);color:var(--ink)}
+.note .nt{display:flex;align-items:center;gap:6px;font-weight:800;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;margin-bottom:5px}
+.note.tip .nt{color:var(--jaune)} .note.praise .nt{color:var(--jaune-ink)}
+.note.tip b{color:var(--cream)}
+.note.praise b{color:var(--ink)}
+.note .btn.subtle{border-color:rgba(255,243,227,.4);color:var(--cream)}
+.note.praise .btn.subtle{border-color:var(--line2);color:var(--jaune-ink)}
+
+/* the same notes, listed on the Auswertung itself: a note whose user_turn misses a
+   rendered turn is invisible in the transcript, and on a phone nobody scrolls for them */
+.sumnote{padding:11px 0;border-bottom:1px solid var(--line)}
+.sumnote:last-child{border-bottom:none;padding-bottom:0}
+.sumnote .sq{font-size:15px;line-height:1.4;color:var(--ink2)}
+.sumnote .sf{font-size:15.5px;line-height:1.4;margin-top:4px}
+.sumnote .sf b{color:var(--ink);font-weight:700}
+.sumnote .se{font-size:13px;line-height:1.5;color:var(--ink2);margin-top:5px}
+
+/* a turn that produced cards says so */
+.turncards{display:inline-flex;align-items:center;font-size:11px;font-weight:700;color:var(--jaune-ink);
+  background:var(--jaune);border-radius:8px;padding:3px 8px;min-height:26px;white-space:nowrap}
+
+/* the three-panel strip: your line, her recast over it, the card that fell out */
+.strip{border:var(--bw) solid var(--edge);border-radius:16px;overflow:hidden}
+.strip>div{padding:14px 16px}
+.strip>div+div{border-top:var(--bw) solid var(--edge)}
+.strip .p-you{background:var(--paper)}
+.strip .p-you .txt{color:var(--ink2)}
+.strip .p-her{background:var(--blue);color:var(--cream);display:flex;gap:10px;align-items:flex-start}
+.strip .p-her .kicker{color:var(--jaune)}
+.strip .p-out{background:var(--jaune)}
+.strip .p-out .kicker{color:var(--jaune-ink)}
+.strip .p-out .txt{font-weight:600}
+.strip .txt{font-size:18px;line-height:1.35;margin-top:6px;text-wrap:pretty}
+.strip .bust{width:30px;height:30px;border-radius:50%;background:rgba(255,243,227,.22);overflow:hidden;display:flex;align-items:flex-end;flex-shrink:0}
+/* the recast marks: what she changed, and what it replaced */
+mark.diffm{background:var(--jaune);color:var(--ink);border-radius:3px;padding:0 4px;font-weight:600}
+.strip .p-her mark.diffm{color:var(--ink)}
+.struck{text-decoration:line-through;text-decoration-color:var(--tomato);text-decoration-thickness:2px}
+/* the gap a cloze leaves behind */
+.gapline{display:inline-block;min-width:46px;border-bottom:3px solid var(--tomato);vertical-align:baseline}
+.p-out .gapline,.rev-card .gapline{border-bottom-color:var(--tomato-deep)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.stat{background:var(--paper);border:var(--bw) solid var(--edge);border-radius:var(--r-sm);padding:13px 14px}
+.stat .v{font-family:var(--disp);font-weight:800;font-size:24px;letter-spacing:-.02em}
+.stat .l{font-size:11.5px;font-weight:600;color:var(--ink3);margin-top:3px}
+
+/* the month, as a page of days. A square a day, seven to a row; the colours are the
+   system's own — her blue for a call, yellow for a day whose cards were done too, tomato
+   for today, and an outline for a day that has not arrived. */
+/* a day is a square, not a panel: the grid keeps its own width so the squares stay the
+   size of days however wide the card gets */
+.monthgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:14px;max-width:340px}
+.mday{aspect-ratio:1;border-radius:8px;background:rgba(23,35,61,.12);display:block}
+.mday.pad{background:none}
+.mday.call{background:var(--blue)}
+.mday.both{background:var(--jaune)}
+.mday.today{background:var(--tomato);box-shadow:inset 0 0 0 2.5px var(--edge)}
+.mday.future{background:none;box-shadow:inset 0 0 0 2px rgba(23,35,61,.22)}
+.mlegend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;font-weight:600;color:var(--ink2)}
+.mlegend span{display:flex;gap:5px;align-items:center}
+.mlegend i{width:10px;height:10px;border-radius:3px;display:block}
+.mlegend i.call{background:var(--blue)} .mlegend i.both{background:var(--jaune)} .mlegend i.today{background:var(--tomato)}
+/* what she said about it, which is the only verdict the month gets */
+.mremark{display:flex;gap:11px;align-items:center;margin-top:12px;background:var(--jaune);
+  border-radius:16px;padding:13px 15px;font-size:13.5px;line-height:1.4;color:var(--jaune-ink);text-wrap:pretty}
+
+/* memory dashboard */
+.ladder{display:flex;gap:5px;margin:10px 0 4px}
+.ladder .rung{flex:1;height:10px;border-radius:5px;background:var(--sand2);position:relative}
+.ladder .rung.hit{background:var(--blue)}
+.ladder .rung.half::after{content:"";position:absolute;inset:0;width:50%;border-radius:5px;background:var(--blue)}
+.ladder-labels{display:flex;gap:5px}
+.ladder-labels span{flex:1;text-align:center;font-size:10.5px;color:var(--ink3);font-family:var(--disp);font-weight:700}
+.skillrow{display:grid;grid-template-columns:110px 1fr 44px;gap:12px;align-items:center;padding:9px 0}
+.skillrow .bar{height:10px;border-radius:5px;background:var(--sand2);overflow:hidden}
+.skillrow .bar i{display:block;height:100%;border-radius:5px;background:var(--blue);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.skillrow .lv{font-family:var(--disp);font-weight:800;font-size:13px;color:var(--ink2);text-align:right}
+.gap{border:var(--bw2) solid var(--line2);border-radius:var(--r-sm);padding:13px 14px;background:var(--paper)}
+.gap+.gap{margin-top:9px}
+.gap .head{display:flex;align-items:center;gap:9px;justify-content:space-between}
+.gap .label{font-weight:600;font-size:14.5px;line-height:1.35}
+.status{font-size:10px;font-weight:800;letter-spacing:.09em;padding:4px 9px;border-radius:999px;text-transform:uppercase;display:inline-flex;align-items:center;gap:5px;flex-shrink:0}
+.status.new{background:var(--jaune);color:var(--jaune-ink)}
+.status.persisting{background:var(--tomato);color:var(--cream)}
+.status.improving{background:var(--blue);color:var(--cream)}
+.status.resolved{background:var(--ink);color:var(--cream)}
+.evi{margin-top:8px;padding:9px 11px;background:var(--sand);border-radius:9px;font-size:12.5px;color:var(--ink2);line-height:1.5}
+.tabs{display:flex;gap:7px;flex-wrap:wrap;padding:2px;margin-bottom:16px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{white-space:nowrap;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:700;color:var(--ink3);background:transparent;border:var(--bw2) solid var(--line2)}
+.tabs button.on{color:var(--cream);background:var(--ink);border-color:var(--ink)}
+.vocab-t{width:100%;border-collapse:collapse;font-size:14.5px}
+.vocab-t td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.vocab-t td:first-child{font-weight:700;white-space:nowrap}
+/* Three columns do not fit a phone: a French phrase and a German compound both refuse to
+   break, so the row sets a minimum width the card cannot honour and "Karte erstellen" is
+   clipped at the edge (.main clips overflow rather than scrolling it). Below tablet width
+   the row stops being a table row: the word takes a line of its own, the gloss and the
+   actions share the next one, and everything wraps. */
+@media(max-width:559px){
+  .vocab-t, .vocab-t tbody{display:block}
+  .vocab-t tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;
+    padding:10px 0;border-bottom:1px solid var(--line)}
+  .vocab-t tr:last-child{border-bottom:none}
+  .vocab-t td{display:block;border-bottom:none;padding:0;width:auto !important}
+  .vocab-t td:first-child{white-space:normal;flex:1 1 100%}
+  .vocab-t td:nth-child(2){flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+  .vocab-t td:nth-child(3){margin-left:auto}
+}
+.sess{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 2px;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.sess:hover .t{color:var(--tomato)}
+.sess .t{font-weight:700;font-size:15px;transition:color .15s}
+pre.brief{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.55;color:var(--ink2);background:var(--sand);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px;max-height:420px;overflow:auto}
+textarea.json{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:300px;line-height:1.5;background:var(--sand)}
+
+/* overlays */
+.overlay{position:fixed;inset:0;z-index:90;background:rgba(23,35,61,.62);display:flex;align-items:center;justify-content:center;padding:20px}
+.sheet{background:var(--paper);color:var(--ink);border:var(--bw) solid var(--edge);border-radius:22px;padding:24px;max-width:430px;width:100%;box-shadow:var(--shadow);text-align:center}
+.spinner{width:42px;height:42px;border-radius:50%;border:3px solid var(--sand2);border-top-color:var(--tomato);animation:spin 0.9s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:120;background:var(--ink);color:var(--cream);border-radius:14px;padding:12px 17px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow);max-width:92vw;display:flex;align-items:center;gap:12px}
+.toast.err{background:var(--tomato);color:var(--cream)}
+.toast-act{color:var(--jaune);font-weight:800;font-size:13px;padding:4px 6px;min-height:28px;flex-shrink:0}
+
+/* daily dashboard */
+.daycard{position:relative;display:flex;flex-direction:column;gap:10px;background:var(--paper);border:var(--bw) solid var(--edge);border-radius:var(--r);padding:16px 17px}
+.daycard.done{background:var(--sand)}
+.daycard .head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tick{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--sand2);color:var(--ink3);flex-shrink:0}
+.tick.on{background:var(--jaune);color:var(--ink)}
+.tick svg{width:14px;height:14px}
+.proposal{display:flex;align-items:flex-start;gap:12px;background:var(--sand);border-radius:14px;padding:12px 13px}
+.proposal .pt{font-family:var(--disp);font-weight:800;font-size:19px;line-height:1.15;letter-spacing:-.015em;text-wrap:pretty}
+.duo{display:grid;grid-template-columns:1fr;gap:12px}
+/* a grid item's automatic minimum is its content: without this one long topic or chip
+   widens the whole column and pushes the buttons off the side of the phone */
+.duo>*{min-width:0}
+@media(min-width:760px){.duo{grid-template-columns:1fr 1fr}}
+
+/* the day's hero: Odile on her blue field, proposing something */
+/* The blue field is the whole call: where you stand, what she is proposing, the two ways
+   to change her mind, the sheet she will read from, and the button itself. Nothing to do
+   with the conversation is left loose on the cream. */
+.hero{background:var(--blue);color:var(--cream);border-radius:var(--r);overflow:hidden;margin-bottom:14px;
+  padding:15px;display:flex;flex-direction:column;gap:10px}
+.hero .htop{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hero .hbrand{font-family:var(--disp);font-weight:800;font-size:16px;color:var(--cream)}
+.hero .hchips{display:flex;gap:6px;align-items:center}
+.hero .hchip{background:rgba(255,243,227,.2);color:var(--cream);font-weight:700;font-size:11px;
+  padding:6px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;border:none;min-height:0}
+.hero .hchip.solid{background:var(--jaune);color:var(--ink);font-weight:800}
+/* she stands on the row's baseline and bleeds past the padding on her own side */
+.hero .hbody{display:flex;align-items:flex-end;min-width:0}
+.hero .od{width:120px;height:120px;flex-shrink:0;margin:-4px -2px -6px -20px}
+.hero .bub{flex:1;min-width:0;background:var(--cream);color:var(--ink);border-radius:18px 18px 4px 18px;padding:12px 14px}
+.hero .bub .pt{font-family:var(--disp);font-weight:800;font-size:clamp(18px,4.8vw,21px);line-height:1.12;letter-spacing:-.015em;text-wrap:pretty}
+/* Under her proposal: how long the call is and which words it is meant to force. Small,
+   flat, one line — it answers "what is this going to be?" without becoming a second
+   headline competing with the topic itself. */
+.hero .bub .psub{margin-top:6px;font-size:12.5px;line-height:1.35;color:var(--ink2);font-weight:600}
+.hero .bub .psub b{font-weight:700;color:var(--ink)}
+.hero .hrow{display:flex;gap:8px;flex-wrap:wrap}
+/* a two-line "Autre idée" reads as a broken button: the label keeps its line and the
+   row wraps instead */
+.hero .hrow .pill{white-space:nowrap;padding:9px 14px;font-size:12px;min-height:36px}
+/* every control on the field reads in cream rather than ink */
+.hero .pill,.hero .matbtn,.hero .btn.subtle,.hero input{
+  background:rgba(255,243,227,.14);border-color:rgba(255,243,227,.42);color:var(--cream)}
+.hero input::placeholder{color:rgba(255,243,227,.6)}
+.hero input:focus{border-color:var(--jaune)}
+.hero .cta.quiet{border-color:rgba(255,243,227,.55);color:var(--cream)}
+.hero .cta:disabled{opacity:1;background:rgba(255,243,227,.16);border-color:transparent;color:rgba(255,243,227,.55)}
+/* what stands between you and the call, said on the field rather than above it */
+.hero .hnote{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:rgba(255,243,227,.14);border-radius:14px;padding:11px 13px;font-size:13.5px;line-height:1.45}
+.hero .hnote .btn{flex-shrink:0}
+@media(min-width:760px){
+  .hero .od{width:164px;height:164px;margin-left:-30px}
+  .hero .bub .pt{font-size:25px}
+}
+
+/* the deck, in the colour the system reserves for what came out of a call. Two sittings a
+   day at whatever hour suits, so this block is named for the act and not for the evening. */
+.reviewblock{background:var(--jaune);border-radius:var(--r);padding:15px 17px}
+.reviewblock .kicker{color:var(--jaune-ink)}
+.reviewblock .tt{font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:-.015em}
+.reviewblock .n{font-weight:700;font-size:13px;color:var(--jaune-ink)}
+.reviewblock .peek{margin-top:10px;background:var(--cream);border-radius:var(--r-sm);padding:11px 13px}
+.reviewblock .peek .q{font-size:17px;font-weight:600;line-height:1.35;text-wrap:pretty}
+.reviewblock .peek .src{font-size:11.5px;font-weight:600;color:var(--ink3);margin-top:6px}
+
+/* review session */
+.rev-stage{display:flex;flex-direction:column;min-height:100dvh;padding:calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto;width:100%}
+.rev-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.rev-bar{flex:1;height:7px;border-radius:4px;background:var(--sand2);overflow:hidden}
+.rev-bar i{display:block;height:100%;background:var(--tomato);border-radius:4px;transition:width .3s}
+/* the card itself is the yellow thing that fell out of the call */
+/* The card's own two tokens, so the gender variants below set a colour rather than restate
+   a component. Everything on the card reads from these. */
+.rev-card{--card:var(--jaune);--card-ink:var(--jaune-ink);
+  position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:var(--card);border:var(--bw) solid var(--edge);border-radius:24px;padding:28px 22px;gap:14px;min-height:320px}
+.rev-card.g-m{--card:var(--bleu-card);--card-ink:var(--bleu-card-ink)}
+.rev-card.g-f{--card:var(--rose-card);--card-ink:var(--rose-card-ink)}
+.rev-type{color:var(--card-ink)}
+.rev-front{font-family:var(--disp);font-weight:800;font-size:clamp(22px,6vw,31px);line-height:1.18;letter-spacing:-.02em;text-wrap:pretty}
+.rev-hint{color:var(--card-ink);font-size:13.5px;font-weight:600;text-wrap:pretty}
+.rev-back{font-family:var(--disp);font-weight:800;font-size:clamp(22px,6vw,30px);color:var(--tomato-deep)}
+.rev-ex{color:var(--ink);font-size:15.5px;line-height:1.5;max-width:420px}
+.rev-actions{margin-top:14px}
+.gradebar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.gradebar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:11px 4px;min-height:58px;border-radius:var(--r-sm);
+  background:var(--paper);border:var(--bw) solid var(--edge);font-weight:800;font-size:13.5px;color:var(--ink)}
+.gradebar button span{font-size:10.5px;color:var(--ink3);font-weight:600}
+.gradebar button.again{background:var(--tomato);color:var(--cream)}
+.gradebar button.again span{color:rgba(255,243,227,.82)}
+.gradebar button.easy{background:var(--jaune);color:var(--ink)}
+.gradebar button.easy span{color:var(--jaune-ink)}
+.speakbtn{width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--ink);border:none;color:var(--jaune)}
+.speakbtn svg{width:18px;height:18px}
+/* Card rows wrap on narrow screens: the text keeps the full width, the icon
+   actions drop to their own right-aligned line instead of crushing the front text. */
+.cardrow{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 10px;padding:12px 2px;border-bottom:1px solid var(--line)}
+.cardrow .crmain{flex:1 1 230px;min-width:0}
+.cardrow .cracts{display:flex;gap:6px;margin-left:auto;flex-shrink:0}
+.speakbtn.sm{width:40px;height:40px}
+.speakbtn.sm svg{width:16px;height:16px}
+.speakbtn.danger{background:var(--tomato);color:var(--cream)}
+.speakbtn.failed{background:transparent;color:var(--ink3);border:var(--bw2) solid var(--line2)}
+.mini-spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line2);border-top-color:var(--ink2);animation:spin .8s linear infinite;display:inline-block}
+.cardrow .f{font-weight:600;font-size:15px;line-height:1.45;overflow-wrap:break-word}
+.cardrow .meta{font-size:11.5px;color:var(--ink3);margin-top:3px;line-height:1.5;font-weight:500}
+/* onboarding language switch */
+.onb-langs{display:flex;gap:3px;flex-wrap:wrap}
+.onb-lang{padding:6px 10px;border-radius:20px;font-size:11.5px;font-weight:700;color:var(--ink3);border:1.5px solid transparent;min-height:30px}
+.onb-lang.on{color:var(--cream);background:var(--ink);border-color:var(--ink)}
+/* card list filter/sort chips + stage markers */
+.fchips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:7px}
+.fchips .flab{font-size:12px;color:var(--ink3);margin-right:2px;font-weight:600}
+.pill.sm{padding:8px 13px;font-size:12.5px;min-height:36px}
+.pill.bad{background:var(--tomato);border-color:var(--tomato);color:var(--cream)}
+.pill .n{opacity:.55;font-weight:600;font-size:11px;margin-left:5px}
+/* make-cards-from-this-turn link under transcript bubbles */
+.mkcards{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--ink3);padding:4px 6px;margin-top:3px;border-radius:8px;min-height:26px}
+.mkcards:hover{color:var(--tomato)}
+.mkcards svg{width:12px;height:12px}
+/* card forge proposals */
+.forge-prop{display:flex;align-items:flex-start;gap:9px;width:100%;text-align:left;padding:12px 11px;border:var(--bw2) solid var(--line2);border-radius:12px;margin-top:8px;background:var(--paper);font-size:14px;line-height:1.45}
+.forge-prop.had{opacity:.5}
+.forge-prop.on{border-color:var(--edge);background:var(--jaune)}
+.forge-prop .fp-main{flex:1;min-width:0;overflow-wrap:break-word}
+.forge-prop .fp-tick{width:20px;height:20px;border-radius:50%;border:2px solid var(--line2);flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+.forge-prop .fp-tick.on{background:var(--ink);border-color:var(--ink);color:var(--cream)}
+/* story player overlay */
+.story-sheet{max-width:560px;text-align:left;max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto}
+.stdots{display:inline-flex;gap:5px;align-items:center;margin-left:auto;padding:0 4px}
+.stdots .dot{width:7px;height:7px;border-radius:50%;background:var(--sand2)}
+.stdots .dot.on{background:var(--jaune)}
+.stdots .dot.now{background:var(--tomato);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(.94);opacity:.65}50%{transform:scale(1.06);opacity:1}}
+.stpara{font-size:15px;line-height:1.75;margin:0 0 10px;color:var(--ink2);border-left:3px solid transparent;padding-left:10px}
+.stpara.reading{border-left-color:var(--tomato);color:var(--ink)}
+.stword{cursor:pointer;border-radius:4px;padding:0 1px}
+.stword:hover{background:var(--jaune-soft)}
+.stword.sel{background:var(--jaune);color:var(--ink)}
+.transbox{border:var(--bw2) solid var(--line2);background:var(--sand);border-radius:12px;padding:11px 12px;margin:8px 0}
+.qblock{margin-bottom:12px}
+.pill.good{background:var(--jaune);border-color:var(--jaune);color:var(--ink)}
+.verdict{font-size:13px;margin-top:7px;font-weight:700}
+.verdict.ok{color:var(--jaune-ink)}
+.verdict.no{color:var(--tomato)}
+/* retell + tutorial */
+.flu-timer{margin-top:14px;text-align:center}
+.flu-timer b{font-size:46px;font-family:var(--disp);font-weight:800}
+.flu-res{display:flex;flex-direction:column;gap:8px;margin:12px 0 6px;width:100%}
+.flu-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.tuto-veil{position:fixed;inset:0;background:rgba(23,35,61,.62);z-index:140;display:flex;align-items:center;justify-content:center;padding:22px}
+.tuto-card{background:var(--paper);border:var(--bw) solid var(--edge);border-radius:var(--r);padding:24px 20px;max-width:400px;width:100%;text-align:center;box-shadow:var(--shadow)}
+.tuto-dots{display:flex;gap:6px;justify-content:center}
+.tuto-dots span{width:7px;height:7px;border-radius:50%;background:var(--sand2)}
+.tuto-dots span.on{background:var(--tomato)}
+.stg{font-weight:700}
+.stg.new{color:var(--blue)}
+.stg.learning{color:var(--tomato)}
+.stg.learned{color:var(--jaune-ink)}
+.stg.suspended{color:var(--ink3)}
+
+/* card list: the batch from the latest conversation sits on top, marked */
+.grouph{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:800;color:var(--ink3);padding:4px 2px 7px}
+.grouph.fresh{color:var(--tomato)}
+.grouph.later{border-top:1px solid var(--line);margin-top:6px;padding-top:14px}
+.cardrow.isnew{border-left:4px solid var(--jaune);padding-left:9px}
+.newchip{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.06em;color:var(--ink);background:var(--jaune);border-radius:6px;padding:1px 6px;margin-right:5px}
+
+/* profiles */
+.profilerow{display:flex;align-items:center;gap:12px;padding:13px 14px;border:var(--bw2) solid var(--line2);border-radius:14px;background:var(--paper);width:100%;text-align:left}
+.profilerow.on{border-color:var(--edge);border-width:var(--bw)}
+.avatar-badge{width:38px;height:38px;border-radius:50%;background:var(--blue);color:var(--cream);display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+.accesscards{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:560px){.accesscards{grid-template-columns:1fr 1fr}}
+.accesscard{text-align:left;border:var(--bw2) solid var(--line2);border-radius:16px;background:var(--paper);padding:15px;display:flex;flex-direction:column;gap:6px}
+.accesscard.on{border-color:var(--edge);border-width:var(--bw);background:var(--jaune)}
+.accesscard .t{font-weight:800;font-size:15px;font-family:var(--disp)}
+.accesscard .d{font-size:12.5px;color:var(--ink2);line-height:1.5}
+
+/* onboarding */
+.onb{max-width:520px;margin:0 auto;padding:calc(40px + env(safe-area-inset-top)) 20px calc(80px + env(safe-area-inset-bottom))}
+.onb h1{font-size:36px;line-height:1.08;margin:14px 0 8px}
+.wordmark{font-family:var(--disp);font-weight:800;font-size:19px;display:flex;align-items:center;gap:9px}
+.field{margin-top:16px}
+.field label{display:block;font-size:10.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{padding:9px 15px;border-radius:999px;background:transparent;border:var(--bw2) solid var(--edge);font-size:12.5px;font-weight:700;color:var(--ink);min-height:38px;display:inline-flex;align-items:center;gap:6px}
+.pill.on{background:var(--jaune);border-color:var(--edge);color:var(--ink)}
+.hr{height:1px;background:var(--line);margin:22px 0}
+.hero-bubble{position:relative;background:var(--cream);border-radius:18px 18px 18px 4px;padding:13px 16px;font-size:15px;line-height:1.45;color:var(--ink);text-wrap:pretty}
+.fr{color:var(--ink)} .de{color:var(--ink3);font-size:12.5px;display:block;margin-top:3px}
+.homehero{display:flex;gap:18px;align-items:center}
+.homehero .av{width:112px;height:112px;flex-shrink:0;border-radius:50%;overflow:hidden;background:var(--blue);display:flex;align-items:flex-end}
+.streak{display:flex;gap:9px}
+.streak .s{display:flex;align-items:center;gap:6px;background:transparent;border:var(--bw2) solid var(--edge);padding:7px 13px;border-radius:999px;font-family:var(--disp);font-weight:800;font-size:13.5px;min-height:38px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--ink2)}
+.fadein{animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+
+/* ---- competency matrix (islands of knowledge) ---- */
+.matrix{display:grid;grid-template-columns:96px repeat(6,1fr);gap:6px;align-items:start}
+.matrix .mx-h{font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--ink3);text-align:center;padding:2px 0}
+.matrix .mx-h.cur{color:var(--tomato)}
+.matrix .mx-cat{font-size:12.5px;font-weight:700;color:var(--ink2);padding-top:6px;line-height:1.3;overflow-wrap:anywhere}
+.mx-cell{display:flex;flex-wrap:wrap;gap:4px;background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:5px;min-height:32px}
+.mx-cell.cur{border-color:var(--tomato)}
+.cc{width:18px;height:18px;border-radius:5px;border:none;padding:0;cursor:pointer;background:var(--sand2);transition:transform .12s;position:relative;color:var(--ink);font-size:12px;line-height:18px;font-weight:800;text-align:center}
+.cc:hover{transform:scale(1.35)}
+.cc.ok{background:var(--jaune)}
+.cc.ko{background:var(--tomato);color:var(--cream)}
+.cc.partial{background:var(--blue);color:var(--cream)}
+.cc.sel{outline:2px solid var(--ink);outline-offset:1px}
+.mx-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;font-weight:600;color:var(--ink3);margin:10px 2px}
+.mx-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:var(--sand2)}
+.mx-legend .ok i{background:var(--jaune)}
+.mx-legend .ko i{background:var(--tomato)}
+.mx-legend .partial i{background:var(--blue)}
+
+/* ---- cheat sheets ---- */
+.sheetveil{position:fixed;inset:0;z-index:110;background:rgba(23,35,61,.62);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+.sheetcard{width:min(94vw,560px);max-height:88dvh;overflow-y:auto;background:var(--paper);color:var(--ink);border:var(--bw) solid var(--edge);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+.matbtn{font-size:12.5px;font-weight:700;color:var(--ink);background:transparent;border:var(--bw2) solid var(--edge);border-radius:999px;
+  padding:8px 14px;min-height:38px;flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+/* pre-call row: the sheet chip takes what is left, the warm-up keeps its full label */
+.prerow{display:flex;align-items:center;gap:8px;min-width:0}
+.warmbtn{flex-shrink:0;min-width:0;padding:8px 13px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---- card personalization (images, Fluent-Forever hooks) ---- */
+.rev-pz{position:absolute;top:12px;right:12px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--card);background:var(--ink);border:none;border-radius:12px}
+.rev-pz svg{width:17px}
+.rev-img{max-width:min(72%,260px);max-height:190px;border-radius:16px;object-fit:cover;border:var(--bw2) solid var(--edge)}
+.thumb{width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;border:1.5px solid var(--line2)}
+.doodle{width:100%;aspect-ratio:1;border-radius:16px;border:var(--bw2) solid var(--edge);background:#fff;touch-action:none;display:block;cursor:crosshair}
+.toolrow{display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap}
+.swatch{width:28px;height:28px;border-radius:999px;border:2px solid transparent;box-shadow:0 0 0 1.5px var(--line2)}
+.swatch.on{border-color:var(--cream);box-shadow:0 0 0 2.5px var(--ink)}
+.swatch.dot{background:var(--sand);display:flex;align-items:center;justify-content:center}
+.swatch.dot i{display:block;border-radius:999px;background:var(--ink)}
+.pz-ideas{display:flex;flex-direction:column;gap:7px}
+.pz-idea{text-align:left;font-size:13.5px;line-height:1.45;padding:11px 12px;border-radius:12px;background:var(--paper);border:var(--bw2) solid var(--line2);color:var(--ink2)}
+.pz-idea.on{border-color:var(--edge);color:var(--ink);background:var(--jaune)}
+.pz-drop{display:flex;flex-direction:column;align-items:center;gap:8px;padding:26px 14px;border:2px dashed var(--line2);border-radius:16px;color:var(--ink2);cursor:pointer;text-align:center}
+.pz-preview{width:100%;border-radius:16px;border:var(--bw2) solid var(--edge);display:block}
+.pz-existing{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.pz-existing img{width:64px;height:64px;border-radius:12px;object-fit:cover;border:1.5px solid var(--line2)}
+
+/* the reuse picker: pictures the deck already holds, one tile per word */
+.pz-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;max-height:46vh;overflow-y:auto}
+.pz-libitem{display:flex;flex-direction:column;gap:5px;padding:0;background:transparent;border:none;color:var(--ink);text-align:center;cursor:pointer}
+.pz-libitem img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;border:1.5px solid var(--line2)}
+.pz-libitem span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pz-libitem:hover img,.pz-libitem:focus-visible img{border-color:var(--tomato)}
+
+/* ---- dictation + kept image + language chips ---- */
+.pz-mic{width:44px;height:44px;flex-shrink:0;border-radius:12px;border:var(--bw2) solid var(--edge);background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.pz-mic svg{width:20px}
+.pz-mic.on{color:var(--cream);background:var(--tomato);border-color:var(--tomato);animation:micpulse 1.2s ease-in-out infinite}
+@keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(240,85,47,.45)}50%{box-shadow:0 0 0 9px rgba(240,85,47,0)}}
+.pz-last{display:flex;align-items:center;gap:10px;margin-top:10px;padding:9px 10px;border:var(--bw2) solid var(--line2);border-radius:12px;background:var(--paper);cursor:pointer}
+.pz-last img{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.langchips{display:flex;flex-wrap:wrap;gap:8px}
+
+.main{min-width:0;overflow-x:clip}
+textarea.json,.json{max-width:100%}
+.navflag{margin-left:7px;font-size:15px}
+/* Active-vocabulary push: the word the call wants placed, and the tick when it lands.
+   It sits under the topic rather than in the focus strip at the top, because it is
+   addressed to the learner and the strip is a list of what Odile is watching for. */
+.wordgoals{display:flex;flex-direction:column;align-items:center;gap:8px;margin:14px auto 0;width:min(92vw,420px);padding:0 16px}
+.wordgoal{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;
+  padding:11px 16px;border-radius:16px;background:rgba(255,243,227,.14);color:var(--cream);
+  animation:goalin .35s ease both}
+.wordgoal.done{background:var(--jaune);color:var(--ink)}
+.wg-kicker{color:var(--jaune)}
+.wordgoal.done .wg-kicker{color:var(--jaune-ink)}
+.wg-word{font-family:var(--disp);font-size:21px;font-weight:800;line-height:1.2;text-align:center;letter-spacing:-.015em}
+.wordgoal.done .wg-word{text-decoration:line-through;text-decoration-color:var(--tomato);text-decoration-thickness:2px}
+.wg-gloss{font-size:12.5px;color:rgba(255,243,227,.72);text-align:center;font-weight:500}
+.wg-tick{width:18px;display:inline-flex;color:var(--ink);margin-top:2px}
+@keyframes goalin{from{opacity:0;transform:translateY(-8px) scale(.96)}to{opacity:1;transform:none}}
+
+/* a client running an older bundle than the deploy (installed web apps cache hard) */
+.updatebar{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  gap:12px;padding:calc(8px + env(safe-area-inset-top)) 14px 8px;font-size:13.5px;font-weight:600;
+  background:var(--ink);color:var(--cream);border-bottom:none}
+.updatebar .btn{padding:6px 12px;font-size:12.5px;border-color:rgba(255,243,227,.45);color:var(--cream)}
+/* the bar is fixed, so the page has to make room for it or it sits on the header */
+.shell.hasupdate .main{padding-top:calc(66px + env(safe-area-inset-top))}
+@media(min-width:900px){.shell.hasupdate .main{padding-top:82px}}
+
+/* ---- deck pace: seven days of cards made against what the reviewing carries ---- */
+.pace{margin-top:10px}
+.pace-plot{position:relative;display:flex;align-items:flex-end;gap:5px;height:96px}
+.pace-col{flex:1;display:flex;align-items:flex-end;height:100%}
+.pace-bar{width:100%;min-height:2px;border-radius:5px 5px 0 0;background:var(--sand2)}
+.pace-bar.over{background:var(--tomato)}
+.pace-line{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.pace-line polyline{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:5 4}
+.pace-days{display:flex;gap:5px;margin-top:5px}
+.pace-days span{flex:1;text-align:center;font-size:10px;font-weight:700;color:var(--ink3);font-variant-numeric:tabular-nums}
+.pace-verdict{font-family:var(--disp);font-weight:800;font-size:17px;line-height:1.25;margin-bottom:4px}
+.pace-key{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;font-weight:600;color:var(--ink2)}
+.pace-key i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.pace-key i.made{background:var(--sand2)}
+.pace-key i.over{background:var(--tomato)}
+.pace-key i.carry{height:0;width:15px;border-top:2px dashed var(--ink);border-radius:0}
+
+/* ---- review: a drag to the right steps back ---- */
+.rev-card{touch-action:pan-y}
+.rev-card.dragging{transition:none}
+.rev-backcue{position:absolute;left:9px;top:50%;transform:translateY(-50%) rotate(180deg);width:17px;display:inline-flex;
+  color:var(--ink3);opacity:.4;pointer-events:none;transition:opacity .12s,color .12s}
+.rev-card.dragging .rev-backcue{opacity:.85}
+.rev-backcue.armed{color:var(--tomato);opacity:1}
