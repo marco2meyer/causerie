@@ -129,10 +129,12 @@ Environment variables (Site configuration → Environment variables):
 | `GOOGLE_CLIENT_ID` | optional | switches auth to Google Sign-In |
 | `ALLOWED_EMAILS` | optional | comma-separated allowlist for Google auth |
 | `ALLOW_OPEN` | optional | `true` disables auth (don't) |
+| `SUPABASE_URL` + `SUPABASE_ANON_KEY` | optional | your own Supabase project (accounts, ledger, usage log); unset = account-less mode |
 
-Build-time (Vite, `.env.local`): `VITE_ADMIN_EMAILS` — comma-separated addresses offered
-the admin usage screen; mirror of the RLS policy in `docs/SCHEMA.sql`, which is what
-actually guards the data.
+Build-time (Vite, `.env.local`): `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (the
+same Supabase project for the client), and `VITE_ADMIN_EMAILS` — comma-separated
+addresses offered the admin usage screen; mirror of the RLS policy in `docs/SCHEMA.sql`,
+which is what actually guards the data.
 
 ## Extension points
 

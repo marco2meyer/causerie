@@ -11,8 +11,11 @@
 import { cfg } from './config.mjs';
 import { authed } from './auth.mjs';
 
-export const SUPA_URL = process.env.SUPABASE_URL || 'https://zkvcfrmctxgslqeicmsn.supabase.co';
-export const SUPA_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_dvwajJuqITMgTp8ObFnjOw_1Ic44rF-';
+// No embedded fallback: Supabase is opt-in per deployment (SUPABASE_URL +
+// SUPABASE_ANON_KEY in the Netlify env), and OFF otherwise — a fork must never
+// route its users into somebody else's project.
+export const SUPA_URL = process.env.SUPABASE_URL || '';
+export const SUPA_KEY = process.env.SUPABASE_ANON_KEY || '';
 
 export function supaEnabled() {
   return !!SUPA_URL && !!SUPA_KEY;

@@ -7,8 +7,10 @@ export const env = (k) => {
   try { return globalThis.process?.env?.[k] || ''; } catch { return ''; }
 };
 
-const SUPA_URL = () => env('SUPABASE_URL') || 'https://zkvcfrmctxgslqeicmsn.supabase.co';
-const SUPA_KEY = () => env('SUPABASE_ANON_KEY') || 'sb_publishable_dvwajJuqITMgTp8ObFnjOw_1Ic44rF-';
+// No embedded fallback (see functions/lib/supauth.mjs): unset means Supabase is off,
+// supaUser() fails on the malformed URL and the ladder falls through to the code gate.
+const SUPA_URL = () => env('SUPABASE_URL') || '';
+const SUPA_KEY = () => env('SUPABASE_ANON_KEY') || '';
 
 const rest = (path, jwt, opts = {}) =>
   fetch(SUPA_URL() + '/rest/v1/' + path, {

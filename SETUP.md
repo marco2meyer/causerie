@@ -39,15 +39,20 @@ New profiles start with three getting-to-know-you calls that establish level and
 Profiles live under the round initial top-right; the optional device sync code (shown
 there) is also the cross-device login.
 
-## Optional: usage log (Supabase)
+## Optional: accounts, sync & usage log (Supabase)
 
-Without this step the app runs fine; the admin usage screen just stays empty. With a
-Supabase project:
+Without this the app runs account-less and everything lives in the browser (plus the
+token-based blob sync). To add real accounts, a cost ledger and the usage log, create
+your own Supabase project:
 
-1. Supabase → SQL Editor → paste `docs/SCHEMA.sql` → Run (idempotent). **First edit the
+1. Point the app at it: `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` in `.env.local`
+   (build time), and the same two values as `SUPABASE_URL` + `SUPABASE_ANON_KEY` in the
+   Netlify environment (functions). Unset means Supabase stays off — a fork never sends
+   its users to somebody else's database.
+2. Supabase → SQL Editor → paste `docs/SCHEMA.sql` → Run (idempotent). **First edit the
    admin address** in `is_causerie_admin` — that RLS policy is what actually guards the
    rows.
-2. Mirror the same address in `VITE_ADMIN_EMAILS` (`.env.local`, see `.env.example`) so
+3. Mirror the same address in `VITE_ADMIN_EMAILS` (`.env.local`, see `.env.example`) so
    the app offers the screen: Settings → "Utilisateurs (admin)".
 
 ## Optional: reading your data from the terminal

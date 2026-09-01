@@ -41,15 +41,23 @@ function loadEnv() {
 }
 loadEnv();
 
-const SUPA_URL = process.env.SUPABASE_URL || 'https://zkvcfrmctxgslqeicmsn.supabase.co';
-const SUPA_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_dvwajJuqITMgTp8ObFnjOw_1Ic44rF-';
-const SITE = process.env.CAUSERIE_SITE || 'https://causerie-marco.netlify.app';
+const SUPA_URL = process.env.SUPABASE_URL || '';
+const SUPA_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SITE = process.env.CAUSERIE_SITE || '';
 
 const die = (msg) => { console.error(msg); process.exit(1); };
+
+/** Which deployment and which Supabase project this reads is the caller's to say —
+ *  there are deliberately no defaults pointing anywhere. */
+const needSite = () => { if (!SITE) die('Set CAUSERIE_SITE in .env.local (your deployment URL).'); };
+const needSupa = () => {
+  if (!SUPA_URL || !SUPA_KEY) die('Set SUPABASE_URL and SUPABASE_ANON_KEY in .env.local (see .env.example).');
+};
 
 /** A user JWT, the same one the browser holds. Password grant against Supabase auth —
  *  the credentials never leave this process and are never printed. */
 async function signIn() {
+  needSupa();
   const email = process.env.CAUSERIE_EMAIL;
   const password = process.env.CAUSERIE_PASSWORD;
   if (!email || !password) {
@@ -76,6 +84,7 @@ async function rest(path, token) {
 
 /** The synced profile blob: not a table, a Netlify blob behind the access code. */
 async function memory() {
+  needSite();
   const token = process.env.CAUSERIE_SYNC_TOKEN;
   const code = process.env.CAUSERIE_ACCESS_CODE;
   if (!token) die('Set CAUSERIE_SYNC_TOKEN in .env.local (app → Profils → sync code).');

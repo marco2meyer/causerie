@@ -2,22 +2,21 @@ import { createClient, type Session, type SupabaseClient } from '@supabase/supab
 import type { Memory } from '../types';
 
 /** Supabase backing: accounts (Google / e-mail code), per-user profile storage and the
- *  per-conversation cost ledger. URL and publishable key are public by design (RLS
- *  guards every row); tests can override via window.CAUSERIE_SUPA = { url, key } or
- *  disable with window.CAUSERIE_SUPA = null. */
+ *  per-conversation cost ledger. OPT-IN: configured via VITE_SUPABASE_URL and
+ *  VITE_SUPABASE_ANON_KEY at build time (.env.local), and OFF without them — a build
+ *  of this repo must never send its users to somebody else's database. URL and
+ *  publishable key are public by design (RLS guards every row); tests can override via
+ *  window.CAUSERIE_SUPA = { url, key } or disable with window.CAUSERIE_SUPA = null. */
 
 declare global {
   interface Window { CAUSERIE_SUPA?: { url: string; key: string } | null }
 }
 
-const DEFAULTS = {
-  url: 'https://zkvcfrmctxgslqeicmsn.supabase.co',
-  key: 'sb_publishable_dvwajJuqITMgTp8ObFnjOw_1Ic44rF-'
-};
-
 function conf(): { url: string; key: string } | null {
   if (typeof window !== 'undefined' && 'CAUSERIE_SUPA' in window) return window.CAUSERIE_SUPA ?? null;
-  return DEFAULTS;
+  const url = import.meta.env?.VITE_SUPABASE_URL || '';
+  const key = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+  return url && key ? { url, key } : null;
 }
 
 let client: SupabaseClient | null = null;
