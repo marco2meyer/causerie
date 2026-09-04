@@ -90,8 +90,10 @@ export function App() {
   const [stale, setStale] = useState(false);
   const anT0 = useRef(0);
   /** Verbatim re-transcriptions, one per recording segment; segments transcribe DURING
-   *  the call, the tail right at hang-up — the analysis only waits for the stragglers. */
-  const verbatimParts = useRef<Promise<string | null>[]>([]);
+   *  the call, the tail right at hang-up — the analysis only waits for the stragglers.
+   *  `seconds` is how much audio the part stands for, so analyze() can tell a complete
+   *  verbatim from one with a lost segment. */
+  const verbatimParts = useRef<{ text: Promise<string | null>; seconds: number }[]>([]);
   /** Resolved verbatim text, held outside analyze() so the save-without-analysis fallback
    *  keeps it: that is exactly the case where the student most wants their own words back. */
   const verbatimText = useRef<string | null>(null);
@@ -188,8 +190,17 @@ export function App() {
     setAnStage({ step: 'verbatim', chars: 0 });
     go('analyzing');
     try {
-      const texts = await Promise.all(verbatimParts.current);
-      const verbatim = texts.filter((t): t is string => !!t).join('\n') || null;
+      const texts = await Promise.all(verbatimParts.current.map(x => x.text));
+      let verbatim = texts.filter((t): t is string => !!t).join('\n') || null;
+      // A verbatim that covers only a corner of the call is worse than none at all: the
+      // analysis judges the student PRIMARILY from it, so one lost segment read as "the
+      // student barely spoke" and a rich 34-turn conversation came back with zero
+      // corrections and zero new words (call of 2026-09-04, verbatim: "Au revoir, deal.").
+      // Under 60% audio coverage the verbatim is withheld and the analysis judges from
+      // the turn transcript alone — degraded, but a real analysis.
+      const okSeconds = texts.reduce((sum, t, i) => sum + (t ? verbatimParts.current[i].seconds : 0), 0);
+      const totalSeconds = p.result.seconds || 0;
+      if (verbatim && totalSeconds > 60 && okSeconds < 0.6 * totalSeconds) verbatim = null;
       verbatimText.current = verbatim;
       setAnStage({ step: 'model', chars: 0 });
       const an = await runAnalysis(mem!, p.sess, p.result.transcript, verbatim,
@@ -221,7 +232,10 @@ export function App() {
 
   const transcribeSegment = (blob: Blob, seconds = 0) => {
     if (!mem || mem.settings.verbatim === false) return;
-    verbatimParts.current.push(transcribeVerbatim(blob, mem.profile.target || 'fr', mem.profile.native || 'de', seconds));
+    verbatimParts.current.push({
+      text: transcribeVerbatim(blob, mem.profile.target || 'fr', mem.profile.native || 'de', seconds),
+      seconds: seconds || 0
+    });
     bookLeg('verbatim', VERBATIM_MODEL, { audio_seconds: Math.round(seconds) });
   };
 
@@ -229,7 +243,7 @@ export function App() {
     if (mem!.settings.verbatim !== false && result.audioBlob) transcribeSegment(result.audioBlob, result.audioSeconds);
     // The turn-by-turn engine transcribed every turn verbatim on its way in, so its own
     // text IS the ground truth: a second pass over the same audio would pay twice for it.
-    if (result.verbatim) verbatimParts.current.push(Promise.resolve(result.verbatim));
+    if (result.verbatim) verbatimParts.current.push({ text: Promise.resolve(result.verbatim), seconds: result.seconds || 0 });
     const u = result.usage;
     const sid = uid('call');
     // An engine that prices its own legs (turn-by-turn: transcription, thinking, voice).

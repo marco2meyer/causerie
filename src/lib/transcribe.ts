@@ -36,16 +36,25 @@ export async function transcribeVerbatim(blob: Blob, language: string, native = 
       for (let i = 0; i < buf.length; i += 0x8000) {
         bin += String.fromCharCode.apply(null, Array.from(buf.subarray(i, i + 0x8000)));
       }
-      const r = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...api.authHeaders() },
-        // audio_seconds is what the server bills on: gpt-transcribe is priced per minute of
-        // audio, and inferring the duration from the byte count was out by roughly half.
-        body: JSON.stringify({ audio_b64: btoa(bin), type: blob.type || 'audio/webm', lang: language, native, audio_seconds: Math.round(seconds) })
-      });
-      if (!r.ok) throw new Error('transcribe ' + r.status);
-      const j = await r.json();
-      return (j.text || '').trim() || null;
+      // One retry on transport trouble: a segment that fails here is a hole in the
+      // verbatim the analysis judges from, and a mid-call network hiccup is exactly the
+      // transient kind a second attempt survives.
+      const body = JSON.stringify({ audio_b64: btoa(bin), type: blob.type || 'audio/webm', lang: language, native, audio_seconds: Math.round(seconds) });
+      for (let attempt = 0; ; attempt++) {
+        const r = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...api.authHeaders() },
+          // audio_seconds is what the server bills on: gpt-transcribe is priced per minute
+          // of audio, and inferring the duration from the byte count was out by roughly half.
+          body
+        }).catch(e => { if (attempt === 0) return null; throw e; });
+        if (r?.ok) {
+          const j = await r.json();
+          return (j.text || '').trim() || null;
+        }
+        if (attempt > 0 || (r && r.status < 500 && r.status !== 429)) throw new Error('transcribe ' + (r ? r.status : 'network'));
+        await new Promise(res => setTimeout(res, 2000));
+      }
     }
     // gpt-transcribe (July 2026 batch model) first, legacy fallback.
     for (const model of [VERBATIM_MODEL, 'gpt-4o-transcribe']) {
