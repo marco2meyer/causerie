@@ -29,32 +29,27 @@ const TONE_INK: Record<string, string> = { a: 'var(--cream)', b: 'var(--cream)',
 function Timeline({ v, lang }: { v: GrammarViz; lang?: string }) {
   const marks = list(v.marks).slice(0, 6);
   if (!marks.length) return null;
-  // The axis runs 0–10 whatever the lesson claimed; a mark outside it is clamped rather
-  // than allowed to draw off the edge of the card.
-  const at = (n: number) => Math.max(0, Math.min(10, n)) * 10;
-  const LANE = 30;
-  // Every child is absolutely positioned, so the container has no height of its own and
-  // would collapse to nothing. One lane per span, plus room for the axis under them.
-  const height = 6 + marks.length * LANE + 8;
+  // The axis runs 0–10 whatever the lesson claimed; a mark outside it is clamped.
+  const at = (n: number) => Math.max(0, Math.min(10, Math.max(0, n))) * 10;
   return (
     <div class="viz-time">
-      <div class="viz-axis" style={{ height: height + 'px' }}>
-        {marks.map((m, i) => {
-          // A point mark carries its label OUTSIDE its own box, to the right, so it needs
-          // room left on the axis; the frame clips, and one placed at the far end would be
-          // drawn off the edge and simply never seen.
-          const point = Math.max(0, m.len) * 10 < 2;
-          const left = Math.min(at(m.at), point ? 60 : 100);
-          const width = Math.min(100 - left, Math.max(0, m.len) * 10);
-          return (
-            <div key={i} class={'viz-span t-' + m.tone + (point ? ' pt' : '')}
-              style={{ left: left + '%', width: Math.max(width, 2) + '%', top: 6 + i * LANE + 'px' }}>
-              <span lang={lang}>{m.label}</span>
+      {marks.map((m, i) => {
+        const left = at(m.at);
+        // A span's width says how long it lasts; a moment is drawn as a dot. Neither has
+        // anything to do with how long its LABEL is, which is why the label lives outside
+        // the bar — inside it, a four-word label on a one-tick moment was simply cut off by
+        // the frame, and the drawing said less than the sentence it was illustrating.
+        const width = Math.min(100 - left, Math.max(0, m.len) * 10);
+        return (
+          <div key={i} class="viz-lane">
+            <div class="viz-track">
+              <div class={'viz-bar t-' + (m.tone === 'b' ? 'b' : 'a') + (width < 2 ? ' moment' : '')}
+                style={{ left: left + '%', width: Math.max(width, 0) + '%' }}></div>
             </div>
-          );
-        })}
-        <div class="viz-line" style={{ top: 6 + marks.length * LANE + 4 + 'px' }}></div>
-      </div>
+            <div class="viz-lab" lang={lang}>{m.label}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }

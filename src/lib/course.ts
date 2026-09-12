@@ -394,7 +394,7 @@ async function writeCourse(mem: Memory, item: CompItem, _fresh: boolean): Promis
     '- Never name the tense or the rule before the `rule` step reveals it — not in a prompt, not in an option, not in an explanation.',
     '- Every `explain` says WHY in one or two lines. Never "Correct!", never "Well done".',
     '- Examples must be sentences THIS learner could plausibly say, at their band, about the things they talk about. Where their own recorded mistakes are given below, build at least two steps directly on them.',
-    '- `viz` is a SHORT list, NEVER longer than two, each entry naming the step it belongs to in `step`. Include ONE where the concept has a shape worth seeing — a stretch of time (`timeline`), a paradigm worth seeing whole (`table`), an order things go in (`chunks`), a two-way split (`split`) — and none at all where a drawing would only redraw the sentence under it. Fill only the fields the chosen kind uses; the rest come back empty.'
+    '- `viz` is a SHORT list, NEVER longer than two, each entry naming the step it belongs to in `step`. Pick the kind by what the point IS, not by what looks nice: `timeline` ONLY where the point is about WHEN things happen relative to each other — never for word order; `chunks` for the order words go in, which is what a question about placement always wants; `table` for a paradigm worth seeing whole; `split` for a two-way contrast. None at all where a drawing would only redraw the sentence under it — that is the usual answer. Fill only the fields the chosen kind uses; the rest come back empty.'
   ].join('\n');
 
   const content = await chat({
@@ -564,7 +564,7 @@ async function writeGuide(mem: Memory, item: CompItem): Promise<GrammarGuide> {
     `- Lines, titles, glosses and traps are in ${support}; every example sentence is in ${P.en}.`,
     '- Lines are reference, not prose: forms, endings, the order things go in, the one-line conditions. A line a learner cannot use while mid-sentence does not belong.',
     `- The traps are the mistakes a ${support} speaker actually makes here, not a general list. Where this learner's own recorded mistakes are given below, one page must address them by name.`,
-    '- `viz` is a short list beside the pages, each entry naming its page in `step`: at most one drawing per page, and only where it earns its place. `timeline` for time, `table` for a paradigm, `chunks` for word order, `split` for a contrast. A conjugation table is almost always worth drawing; everything else usually is not.'
+    '- `viz` is a short list beside the pages, each entry naming its page in `step`: at most one drawing per page, and only where it earns its place. `timeline` ONLY for when things happen relative to each other, never for word order; `chunks` for the order words go in; `table` for a paradigm; `split` for a two-way contrast. A conjugation table is almost always worth drawing; everything else usually is not.'
   ].join('\n');
 
   const content = await chat({

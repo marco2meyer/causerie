@@ -296,32 +296,6 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
       {/* Ear training is the day itself during the A0/A1 fortnight, an extra above it after. */}
       {ear && <div style="margin-top:16px">{pronCard}</div>}
 
-      {/* Grammar: the third thing the day asks for, after the conversation and the cards.
-          One concept at a time, taken off the competency map — worst gap at or below the
-          learner's own band first. Before the course it offers the lesson; after it, the
-          fiche, because that is what the same button means once the lesson has been sat
-          through. */}
-      {grammarOn && gram && (
-        <div class="daycard" style="margin-top:16px">
-          <div class="head">
-            <span class="kicker">{S.gram.kicker}</span>
-            <span class="lvl">{gram.item.band}</span>
-          </div>
-          <div style="font-family:var(--disp);font-weight:800;font-size:19px;line-height:1.2" lang={mem.profile.target}>
-            {gram.item.label}
-          </div>
-          {gram.topic && (() => {
-            const t = drillTally(gram.topic);
-            return <p class="muted" style="font-size:13px;margin:0;line-height:1.5">
-              {t.tries ? S.gram.since(t.ok, t.tries) : S.gram.fresh}
-            </p>;
-          })()}
-          <button class={'btn big ' + (gram.topic ? 'subtle' : 'ghost')} onClick={() => go('grammar')}>
-            {gram.topic ? S.gram.sheet : <>{S.gram.start} · {S.gram.minutes}</>}
-          </button>
-        </div>
-      )}
-
       {/* What came out of the calls, in the colour the system reserves for it. Two sittings
           a day at whatever hour suits, so it is named for the act, not for the evening. */}
       <div class="reviewblock">
@@ -351,6 +325,31 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
           {queueLen > 0 && !rs && <span class="meta">{S.today.nCards(queueLen)}</span>}
         </button>
       </div>
+
+      {/* Grammar: the third field of the day, and the last of them.
+          It sits BELOW the cards because it is the strand that can wait — the conversation
+          is the day, the deck is what the conversation left behind and goes stale if it is
+          skipped, and a grammar concept is patient: it is there tomorrow, unchanged. It gets
+          the house's third colour for the same reason the other two have theirs. Before the
+          course the button offers the lesson; after it, the fiche, because that is what the
+          same button means once the lesson has been sat through. */}
+      {grammarOn && gram && (
+        <div class="gramblock">
+          <div class="spread" style="align-items:baseline">
+            <div class="tt">{S.gram.kicker}</div>
+            <span class="lvl">{gram.item.band}</span>
+          </div>
+          <div class="gt" lang={mem.profile.target}>{gram.item.label}</div>
+          {gram.topic && (() => {
+            const t = drillTally(gram.topic);
+            return <div class="n">{t.tries ? S.gram.since(t.ok, t.tries) : S.gram.fresh}</div>;
+          })()}
+          <button class="cta ink" style="margin-top:2px" onClick={() => go('grammar')}>
+            <span>{gram.topic ? S.gram.sheet : S.gram.start}</span>
+            {!gram.topic && <span class="meta">{S.gram.minutes}</span>}
+          </button>
+        </div>
+      )}
 
       {/* The deck's own bookkeeping — due/new/total, the rhythm it is sized against, the
           backlog — lives on the Cartes screen. This one says what is waiting. */}

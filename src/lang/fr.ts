@@ -189,7 +189,7 @@ const ui = {
   memory: {
     title: 'Mémoire', savedServer: 'sauvegardée sur le serveur', savedLocal: 'dans ce navigateur uniquement',
     intro: 'Tout ce qu’Odile sait de toi. Chaque entrée se lit, se modifie, s’efface.',
-    tabs: { over: 'Aperçu', comp: 'Carte', prog: 'Progrès', carnet: 'Carnet', sess: 'Conversations', adv: 'Avancé' },
+    tabs: { over: 'Aperçu', comp: 'Carte', gram: 'Grammaire', prog: 'Progrès', carnet: 'Carnet', sess: 'Conversations', adv: 'Avancé' },
     tabsOld: { gaps: 'Lacunes', str: 'Points forts', facts: 'Faits', voc: 'Vocabulaire', brief: 'Briefing', data: 'Données' },
     portraitTitle: 'Qui tu es, pour elle',
     portraitNote: 'Ce qu’Odile a en tête en décrochant. Les faits qui reviennent d’un appel à l’autre font le portrait ; les autres ne passent qu’en anecdote.',
@@ -384,6 +384,8 @@ const ui = {
     extra: (n: number) => ` + ${n} grammaire`,
     drill: 'Grammaire',
     /* settings */
+    frOnlyNote: 'Les cours de grammaire n’existent qu’en français pour l’instant.',
+    queueIntro: 'Ce qu’elle t’apprendra ensuite, dans l’ordre. Les lacunes de ton niveau et en dessous d’abord — monte ce qui presse, écarte ce qui n’a pas lieu d’être.',
     share: 'Exercices dans les révisions', shareOff: 'Aucun',
     shareNote: (n: number, cards: number) => `Environ ${n} exercices en plus des ${cards} cartes.`,
     queue: 'À travailler', done: 'Acquis', skipped: 'Écartés',

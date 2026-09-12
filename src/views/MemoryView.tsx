@@ -15,6 +15,7 @@ import { deepClone, download, fmtDate, fmtMonth, norm, todayISO } from '../lib/u
 import { monthStats } from '../lib/month';
 import { Ladder, statusLabel, statusIcon } from '../components/charts';
 import { Bust } from '../components/Avatar';
+import { GrammarQueue } from '../components/GrammarQueue';
 import { I } from '../components/icons';
 import { type ToastFn } from '../components/Toast';
 import { pack, ui } from '../lang';
@@ -34,7 +35,7 @@ interface Props {
  *  did we say, and the machinery underneath. `prog` merges the old Lacunes and Points
  *  forts — one subject read from both ends; `carnet` merges Faits and Vocabulaire — both
  *  are what she remembers; `adv` merges Briefing and Données — both are machinery. */
-const TAB_KEYS = ['over', 'comp', 'prog', 'carnet', 'sess', 'adv'] as const;
+const TAB_KEYS = ['over', 'comp', 'gram', 'prog', 'carnet', 'sess', 'adv'] as const;
 
 /** A heading inside a merged tab, so two former tabs still read as two things. */
 const Section = ({ title, sub }: { title: string; sub?: string }) => (
@@ -346,6 +347,10 @@ export function MemoryView({ mem, setMem, openSession, openCheckin, toast, ext }
           </div>
         );
       })()}
+
+      {tab === 'gram' && (mem.profile.target === 'fr'
+        ? <GrammarQueue mem={mem} update={update} />
+        : <p class="muted" style="font-size:14px;line-height:1.5">{S.gram.frOnlyNote}</p>)}
 
       {tab === 'prog' && (
         <div>

@@ -186,7 +186,7 @@ const ui: UIStrings = {
   memory: {
     title: 'Memória', savedServer: 'guardada no servidor', savedLocal: 'só neste navegador',
     intro: 'Tudo o que a Odile sabe de ti. Cada entrada lê-se, edita-se, apaga-se.',
-    tabs: { over: 'Visão geral', comp: 'Mapa', prog: 'Progresso', carnet: 'Caderno', sess: 'Conversas', adv: 'Avançado' },
+    tabs: { over: 'Visão geral', comp: 'Mapa', gram: 'Gramática', prog: 'Progresso', carnet: 'Caderno', sess: 'Conversas', adv: 'Avançado' },
     tabsOld: { gaps: 'Lacunas', str: 'Pontos fortes', facts: 'Factos', voc: 'Vocabulário', brief: 'Briefing', data: 'Dados' },
     portraitTitle: 'Quem tu és, para ela',
     portraitNote: 'O que a Odile tem em mente quando atende. Os factos que voltam de chamada para chamada fazem o retrato; os outros só aparecem de passagem.',
@@ -381,6 +381,8 @@ const ui: UIStrings = {
     extra: (n: number) => ` + ${n} gramática`,
     drill: 'Gramática',
     /* settings */
+    frOnlyNote: 'Por agora, os cursos de gramática só existem em francês.',
+    queueIntro: 'O que te vai ensinar a seguir, por ordem. Primeiro as lacunas do teu nível e abaixo — sobe o que urge, põe de parte o que não se aplica.',
     share: 'Exercícios nas revisões', shareOff: 'Nenhum',
     shareNote: (n: number, cards: number) => `Cerca de ${n} exercícios além das ${cards} cartas.`,
     queue: 'Para trabalhar', done: 'Adquirido', skipped: 'De parte',
