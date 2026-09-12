@@ -74,10 +74,19 @@ describe('the loop back into the briefing', () => {
     return m;
   };
 
-  it('tells her the actual number when she has been taking the room', () => {
+  it('tells her the actual number when she has been taking the room — the last call, when that is the one that tripped it', () => {
     const brief = buildTutorPrompt(hogging(), { topic: 'le marché', targets: [] });
-    expect(brief).toContain(pack('fr').tutor.talkHog(69).split('\n')[0]);
-    expect(brief).toMatch(/69 %/);
+    expect(brief).toContain(pack('fr').tutor.talkHog(72).split('\n')[0]);
+    expect(brief).toMatch(/72 %/);   // sessions end on 0.72; the average of the four is 69
+  });
+
+  it('one bad call reaches her even when the three before it were balanced', () => {
+    const m = blankMem();
+    m.introDone = true;
+    // Exactly the shape of the real week: 41 %, 48 %, 45 % — then a roleplay at 63 %.
+    m.sessions = [sess(0.41), sess(0.48), sess(0.45), sess(0.63)];
+    expect(recentTutorShare(m)!).toBeLessThan(TALK_HIGH);   // the average hides it
+    expect(buildTutorPrompt(m, { topic: 'le marché', targets: [] })).toMatch(/63 %/);
   });
 
   it('says nothing at all once the ratio is healthy', () => {

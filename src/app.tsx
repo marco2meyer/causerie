@@ -4,6 +4,7 @@ import type { CallSession, CheckinPeriod, CostLeg, Memory } from './types';
 import { api, type ApiInfo } from './lib/api';
 import { runAnalysis } from './lib/analysis';
 import { applyAnalysis } from './lib/merge';
+import { reanalyseSession } from './lib/reanalyse';
 import { transcribeVerbatim, VERBATIM_MODEL } from './lib/transcribe';
 import { appendLocalCost, estimateCost } from './lib/costs';
 import { isAdmin, logEvent, logLogin } from './lib/events';
@@ -15,9 +16,11 @@ import { saveMem } from './lib/storage';
 import { enableSync, pullIfNewer, syncAvailable, wireAutoPush } from './lib/sync';
 import { onSupaChange, supaEmail, supaInit } from './lib/supa';
 import { pack, setUiLang, ui, uiLangFor } from './lang';
+import { applyTutor } from './lib/tutors';
 import { configureTts } from './lib/tts';
 import { watchForUpdate } from './lib/version';
 import { settleRank } from './lib/gamify';
+import { loadCompanion, reloadCompanion, type CompanionModule } from './lib/companionSeam';
 import { deepClone, todayISO, uid } from './lib/utils';
 import { Odile } from './components/Avatar';
 import { I } from './components/icons';
@@ -36,14 +39,17 @@ import { Profiles } from './views/Profiles';
 import { Settings } from './views/Settings';
 import { Retell } from './views/Retell';
 import { Pron } from './views/Pron';
+import { Grammar } from './views/Grammar';
 import { Admin } from './views/Admin';
 import { Help } from './views/Help';
 import { Tutorial } from './components/Tutorial';
 
 type View = 'boot' | 'onboard' | 'today' | 'call' | 'analyzing' | 'analyzeFail' | 'callstats' | 'review' | 'admin'
-  | 'revsession' | 'cards' | 'memory' | 'settings' | 'profiles' | 'checkin' | 'retell' | 'help' | 'pron';
+  | 'revsession' | 'cards' | 'memory' | 'settings' | 'profiles' | 'checkin' | 'retell' | 'help' | 'pron' | 'grammar' | 'companion';
 
-interface Pending { result: CallResult; sess: CallSession }
+/** A call waiting for its analysis. `id` is the record keepCall() already wrote, which the
+ *  analysis fills in — a retry must not leave a second copy of the same conversation. */
+interface Pending { result: CallResult; sess: CallSession; id: string }
 
 /** Live progress of the post-call pipeline (verbatim re-transcription → analysis). */
 interface AnStage { step: 'verbatim' | 'model'; chars: number }
@@ -88,15 +94,15 @@ export function App() {
   const [anStage, setAnStage] = useState<AnStage | null>(null);
   /** A newer build is deployed than the one running here (installed web apps cache hard). */
   const [stale, setStale] = useState(false);
+  /** Optional extension module, if this build carries one and the server allows it. */
+  const [ext, setExt] = useState<CompanionModule | null>(null);
+  const memRef = useRef<Memory | null>(null);
   const anT0 = useRef(0);
   /** Verbatim re-transcriptions, one per recording segment; segments transcribe DURING
    *  the call, the tail right at hang-up — the analysis only waits for the stragglers.
    *  `seconds` is how much audio the part stands for, so analyze() can tell a complete
    *  verbatim from one with a lost segment. */
   const verbatimParts = useRef<{ text: Promise<string | null>; seconds: number }[]>([]);
-  /** Resolved verbatim text, held outside analyze() so the save-without-analysis fallback
-   *  keeps it: that is exactly the case where the student most wants their own words back. */
-  const verbatimText = useRef<string | null>(null);
   /** What this call is costing, leg by leg, priced on the client from the same table the
    *  server bills on. Collected during the call because the pieces are only knowable where
    *  they happen: the realtime usage arrives with the last response, each verbatim segment
@@ -108,7 +114,9 @@ export function App() {
   };
 
   const setMem = (m: Memory) => setMemState(m);
+  memRef.current = mem;
   setUiLang(uiLangFor(mem)); // target language from B1 (immersion), support language below, browser locale before onboarding
+  applyTutor(mem); // face, strings and briefing follow the profile's tutor
   if (mem) configureTts(pack(mem.profile.target).en); // card audio follows the target language, not French
   const S = ui();
   const toast: ToastFn = (msg, err = false, action) => {
@@ -117,9 +125,29 @@ export function App() {
     toastT.current = setTimeout(() => setToastS(null), action ? 6500 : 4200);
   };
 
+  const adoptExt = (x: CompanionModule | null) => {
+    if (!x) return;
+    x.attach({ mem: () => memRef.current, setMem: m => { memRef.current = m; setMem(m); }, go, toast });
+    setExt(x);
+    void x.syncInbox('boot');
+  };
+
+  /** Re-detect the server, then ask for the extension again. The seam keeps the first
+   *  answer, and a probe that runs before /api/health has answered says "none" — so every
+   *  second ask (a login, a token refresh, the self-heal below) waits for the detection. */
+  const refreshApiAndExt = () => api.detect().then(i => { setApiInfo(i); return reloadCompanion(); }).then(adoptExt);
+
   useEffect(() => {
     wireAutoPush();
-    const off = onSupaChange(() => { refreshApi(); logLogin(); });
+    // The boot probe for the extension runs before anyone is signed in on a fresh
+    // device; a login gets a second ask so the onboarding form can carry its card. The
+    // client's INITIAL_SESSION is the session the boot below already asks with — and it
+    // lands while the health probe is still in flight, which is exactly the early ask
+    // that used to leave a warm reload without its extension.
+    const off = onSupaChange((_s, event) => {
+      logLogin();
+      if (event !== 'INITIAL_SESSION') void refreshApiAndExt();
+    });
     const { mem: m } = initProfiles();
     setMemState(m);
     supaInit().then(() => api.detect()).then(async i => {
@@ -145,11 +173,30 @@ export function App() {
       const due = cur ? dueCheckin(cur) : null;
       if (due) setCheckinPeriod(due);
       setView(v => (v === 'boot' ? (m ? (due ? 'checkin' : 'today') : 'onboard') : v));
+      // The extension, if any, is asked for only once the server and the session are known.
+      void loadCompanion().then(adoptExt);
     });
     return off;
   }, []);
 
+  useEffect(() => {
+    if (!ext) return;
+    const h = () => { if (document.visibilityState === 'visible') void ext.syncInbox('visible'); };
+    document.addEventListener('visibilitychange', h);
+    return () => document.removeEventListener('visibilitychange', h);
+  }, [ext]);
+
   useEffect(() => watchForUpdate(() => setStale(true)), []);
+
+  // Self-heal a failed boot probe: a PWA that came up while the network (or a deploy
+  // swap) ate /api/health would otherwise sit in local mode — "missing OpenAI key" —
+  // until the next full reload. Re-detect whenever it returns to the foreground unwell —
+  // and ask for the extension again, since its boot probe failed for the same reason.
+  useEffect(() => {
+    const h = () => { if (document.visibilityState === 'visible' && api.mode !== 'server') void refreshApiAndExt(); };
+    document.addEventListener('visibilitychange', h);
+    return () => document.removeEventListener('visibilitychange', h);
+  }, []);
 
   /** Weeks are judged on boot, not while they run: a fortnight away has to cost what a
    *  fortnight away costs, and the app cannot count on being open when Monday arrives. */
@@ -176,11 +223,13 @@ export function App() {
    *  archive a prompt that never existed. Same inputs the engine uses, so the same text. */
   const briefing = useRef('');
 
-  const startCall = (sess: CallSession) => {
+  const startCall = async (sess: CallSession) => {
     verbatimParts.current = [];
-    verbatimText.current = null;
     costLegs.current = [];
-    briefing.current = mem ? buildTutorPrompt(mem, sess) : '';
+    // The extension may have a last word for this call; it bounds its own wait.
+    if (ext) await ext.syncInbox('call');
+    const cur = memRef.current;
+    briefing.current = cur ? buildTutorPrompt(cur, sess) : '';
     setCallSess(sess);
     go('call');
   };
@@ -201,11 +250,15 @@ export function App() {
       const okSeconds = texts.reduce((sum, t, i) => sum + (t ? verbatimParts.current[i].seconds : 0), 0);
       const totalSeconds = p.result.seconds || 0;
       if (verbatim && totalSeconds > 60 && okSeconds < 0.6 * totalSeconds) verbatim = null;
-      verbatimText.current = verbatim;
+      // Onto the record before the model is asked anything: his own words are the thing the
+      // student most wants back when the analysis then fails.
+      keepVerbatim(p.id, verbatim);
       setAnStage({ step: 'model', chars: 0 });
-      const an = await runAnalysis(mem!, p.sess, p.result.transcript, verbatim,
+      const an = await runAnalysis(memRef.current!, p.sess, p.result.transcript, verbatim,
         chars => setAnStage({ step: 'model', chars }));
-      const m = deepClone(mem!);
+      // From the ref, not from this closure's `mem`: keepCall() and keepVerbatim() have
+      // written to memory since the call ended, and the analysis fills in THAT record.
+      const m = deepClone(memRef.current!);
       // Utterance fluency from the learner's own verbatim speech: an objective wpm per call.
       const mins = (p.result.seconds || 0) / 60;
       const wpm = verbatim && mins > 0.5 ? Math.round(verbatim.split(/\s+/).filter(Boolean).length / mins) : undefined;
@@ -214,7 +267,7 @@ export function App() {
       costLegs.current = costLegs.current.filter(l => l.kind !== 'analysis');
       if (an._usage) bookLeg('analysis', an._model || mem!.settings.analysisModel || 'gpt-5.6-sol', an._usage);
       const rec = applyAnalysis(m, an, {
-        topic: p.sess.topic, targets: p.sess.targets,
+        id: p.id, topic: p.sess.topic, targets: p.sess.targets,
         transcript: p.result.transcript, seconds: p.result.seconds, wpm, verbatim,
         wordGoals: p.result.wordGoals, materials: p.sess.materials, briefing: briefing.current,
         tutorShare: tutorShare(p.result.transcript) ?? undefined,
@@ -237,6 +290,38 @@ export function App() {
       seconds: seconds || 0
     });
     bookLeg('verbatim', VERBATIM_MODEL, { audio_seconds: Math.round(seconds) });
+  };
+
+  /** The call, on record, before anything is asked of a model: ten minutes of conversation
+   *  must not depend on an analysis that can fail, time out or meet an expired token, and
+   *  a `pending` held in page memory dies with the tab — which is how a whole call went
+   *  missing (transcript, cards, and the call itself, invisible to the companion's effort
+   *  meter). The analysis fills this record in afterwards; lib/reanalyse can do it later. */
+  const keepCall = (p: Pending): string => {
+    const m = deepClone(mem!);
+    m.sessions.push({
+      id: p.id, date: todayISO(), at: new Date().toISOString(), topic: p.sess.topic, source: 'causerie',
+      minutes: Math.max(1, Math.round(p.result.seconds / 60)), seconds: Math.round(p.result.seconds),
+      targets: p.sess.targets, transcript: p.result.transcript, analysis: null, summary: S.app.savedNoAnalysis,
+      ...(p.result.wordGoals?.length ? { wordGoals: p.result.wordGoals } : {}),
+      ...(p.sess.materials?.length ? { materials: p.sess.materials } : {}),
+      ...(briefing.current ? { briefing: briefing.current } : {}),
+      ...(costLegs.current.length ? { costs: costLegs.current.slice() } : {})
+    });
+    saveMem(m); setMemState(m); memRef.current = m;
+    return p.id;
+  };
+
+  /** What the analysis learns on its way that the record should keep even if the model then
+   *  refuses: his own words, as his microphone heard them. */
+  const keepVerbatim = (id: string, verbatim: string | null) => {
+    if (!verbatim || !memRef.current) return;
+    const m = deepClone(memRef.current);
+    const rec = m.sessions.find(s => s.id === id);
+    if (!rec) return;
+    rec.verbatim = verbatim;
+    rec.costs = costLegs.current.slice();
+    saveMem(m); setMemState(m); memRef.current = m;
   };
 
   const endCall = (result: CallResult) => {
@@ -287,24 +372,38 @@ export function App() {
       go('today');
       return;
     }
-    const p = { result, sess: callSess! };
+    const p = { result, sess: callSess!, id: uid('sess') };
+    keepCall(p);
     setPending(p);
     void analyze(p);
   };
 
-  const saveWithoutAnalysis = () => {
-    if (!pending || !mem) return;
-    const m = deepClone(mem);
-    m.sessions.push({
-      id: uid('sess'), date: todayISO(), at: new Date().toISOString(), topic: pending.sess.topic, source: 'causerie',
-      minutes: Math.max(1, Math.round(pending.result.seconds / 60)), seconds: Math.round(pending.result.seconds),
-      transcript: pending.result.transcript, analysis: null, summary: S.app.savedNoAnalysis,
-      ...(verbatimText.current ? { verbatim: verbatimText.current } : {}),
-      ...(costLegs.current.length ? { costs: costLegs.current.slice() } : {})
-    });
-    saveMem(m); setMemState(m); setPending(null);
+  /** The analysis failed and he would rather not try again now: the call is already saved,
+   *  so there is nothing to write — the review screen offers the analysis whenever he wants
+   *  it (lib/reanalyse). */
+  const keepWithoutAnalysis = () => {
+    setPending(null);
     toast(S.app.transcriptKept);
     go('today');
+  };
+
+  /** A call kept without its analysis, analysed now: same screen, same writes, read back
+   *  from the record. Offered on the debrief of any such call, however old. */
+  const reanalyse = async (id: string) => {
+    if (!memRef.current) return;
+    anT0.current = Date.now();
+    setAnStage({ step: 'model', chars: 0 });
+    go('analyzing');
+    try {
+      const { mem: m, rec } = await reanalyseSession(memRef.current, id, chars => setAnStage({ step: 'model', chars }));
+      saveMem(m); setMemState(m);
+      setReviewId(rec.id); setLiveReview(true); go('callstats');
+    } catch (e) {
+      console.warn(e);
+      const msg = (e as Error).message;
+      toast(S.app.analyzeFailToast(msg === 'AUTH' ? S.app.authExpired : msg), true);
+      setReviewId(id); setLiveReview(false); go('review');
+    }
   };
 
   /** Put the review off until tomorrow. Offering it again on the next open of the same day
@@ -319,7 +418,7 @@ export function App() {
   };
 
   const openSession = (id: string) => { setReviewId(id); setLiveReview(false); go('review'); };
-  const onboardDone = (m: Memory) => {
+  const onboardDone = (m: Memory, opts?: { openExtension?: boolean }) => {
     createProfile(m.profile.name || 'Profil', m);
     setMemState(m);
     setNewProfileFlow(false);
@@ -327,7 +426,7 @@ export function App() {
       const c = deepClone(m);
       void enableSync(c).then(tok => { if (tok) setMemState(c); });
     }
-    go('today');
+    go(opts?.openExtension && ext ? 'companion' : 'today');
   };
 
   if (view === 'boot') {
@@ -342,7 +441,7 @@ export function App() {
       <div>
         <Toast t={toastS} onAction={() => setToastS(null)} />
         <Onboarding
-          apiInfo={apiInfo} needsAccess={!api.ready()} autoResume={!mem} toast={toast} onDone={onboardDone}
+          apiInfo={apiInfo} needsAccess={!api.ready()} autoResume={!mem} toast={toast} onDone={onboardDone} ext={ext}
           onCancel={newProfileFlow && mem ? () => { setNewProfileFlow(false); go('profiles'); } : undefined}
         />
       </div>
@@ -383,7 +482,7 @@ export function App() {
           <div class="muted" style="font-size:14px;margin:8px 0 16px">{S.app.failSub}</div>
           <div class="row" style="justify-content:center;flex-wrap:wrap">
             <button class="btn primary" onClick={() => pending && void analyze(pending)}>{S.common.retry}</button>
-            <button class="btn ghost" onClick={saveWithoutAnalysis}>{S.app.keepTranscript}</button>
+            <button class="btn ghost" onClick={keepWithoutAnalysis}>{S.app.keepTranscript}</button>
           </div>
         </div>
       </div>
@@ -408,7 +507,7 @@ export function App() {
     return (
       <div>
         <Toast t={toastS} onAction={() => setToastS(null)} />
-        <ReviewSession mem={mem} setMem={setMem} onExit={() => { setRevCap(undefined); go('today'); }} toast={toast} cap={revCap} />
+        <ReviewSession mem={mem} setMem={setMem} onExit={() => { setRevCap(undefined); go('today'); }} toast={toast} cap={revCap} ext={ext} />
       </div>
     );
   }
@@ -417,6 +516,14 @@ export function App() {
       <div>
         <Toast t={toastS} onAction={() => setToastS(null)} />
         <Pron mem={mem} setMem={setMem} onExit={() => go('today')} toast={toast} />
+      </div>
+    );
+  }
+  if (view === 'grammar' && mem) {
+    return (
+      <div>
+        <Toast t={toastS} onAction={() => setToastS(null)} />
+        <Grammar mem={mem} setMem={setMem} onExit={() => go('today')} toast={toast} />
       </div>
     );
   }
@@ -453,31 +560,32 @@ export function App() {
       </nav>
       <main class="main">
         <Boundary key={view} onBack={() => go('today')}>
-          {view === 'today' && mem && <Today mem={mem} setMem={setMem} apiInfo={apiInfo} go={go} startCall={startCall} openCheckin={p => { setCheckinPeriod(p); go('checkin'); }} toast={toast}
-            warmup={() => { setRevCap(3); go('revsession'); }} />}
+          {view === 'today' && mem && <Today mem={mem} setMem={setMem} apiInfo={apiInfo} go={go} startCall={startCall} openCheckin={p => { setCheckinPeriod(p); go('checkin'); }} toast={toast} ext={ext} />}
           {view === 'checkin' && mem && (
           <Checkin mem={mem} setMem={setMem} period={checkinPeriod} toast={toast}
             onDone={done => { if (!done) snoozeCheckin(); go('today'); }} />
         )}
           {view === 'cards' && mem && (
-            <Cards mem={mem} setMem={setMem} go={go} toast={toast} fromCall={!!cardsBack}
+            <Cards mem={mem} setMem={setMem} go={go} toast={toast} fromCall={!!cardsBack} ext={ext}
               onBack={cardsBack ? () => { setCardsBack(null); go('review'); } : undefined} />
           )}
-          {view === 'memory' && mem && <MemoryView mem={mem} setMem={setMem} openSession={openSession} openCheckin={p => { setCheckinPeriod(p); go('checkin'); }} toast={toast} />}
+          {view === 'memory' && mem && <MemoryView mem={mem} setMem={setMem} ext={ext} openSession={openSession} openCheckin={p => { setCheckinPeriod(p); go('checkin'); }} toast={toast} />}
           {view === 'review' && mem && sessObj && (
             <Review mem={mem} setMem={setMem} sess={sessObj} live={liveReview}
               go={v => { setLiveReview(false); go(v); }}
+              onReanalyse={() => void reanalyse(sessObj.id)}
               openCards={() => { setCardsBack(sessObj.id); go('cards'); }}
               toast={toast} />
           )}
           {view === 'profiles' && mem && (
-            <Profiles mem={mem} setMem={setMem} go={go} toast={toast}
+            <Profiles mem={mem} setMem={setMem} go={go} toast={toast} ext={ext}
               onSwitch={m => { setMemState(m); go('today'); }}
               onNewProfile={() => { setNewProfileFlow(true); go('onboard'); }} />
           )}
-          {view === 'settings' && mem && <Settings mem={mem} setMem={setMem} apiInfo={apiInfo} refreshApi={refreshApi} go={go} toast={toast} />}
+          {view === 'settings' && mem && <Settings mem={mem} setMem={setMem} apiInfo={apiInfo} refreshApi={refreshApi} go={go} toast={toast} ext={ext} />}
           {view === 'help' && <Help onBack={() => go('settings')} />}
-          {view === 'admin' && isAdmin(supaEmail()) && <Admin onBack={() => go('settings')} />}
+          {view === 'admin' && isAdmin(supaEmail()) && <Admin onBack={() => go('settings')} ext={ext} />}
+          {view === 'companion' && ext && <ext.CompanionView back={() => go('today')} />}
         </Boundary>
       </main>
       {mem && !tutoDone && view === 'today' && (

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'preact/hooks';
 import type { CEFRBand, LangCode, Memory } from '../types';
 import { BANDS } from '../lib/cefr';
 import { LANGS } from '../lib/langs';
-import { activeProfile, deleteProfile, listProfiles, profileLang, renameProfile, switchProfile } from '../lib/profiles';
+import { activeProfile, listProfiles, profileLang, removeProfile, renameProfile, switchProfile } from '../lib/profiles';
 import { createProfile } from '../lib/profiles';
 import { blankMem } from '../lib/storage';
-import { deleteRemote, disableSync, enableSync, pull, syncAvailable } from '../lib/sync';
+import { disableSync, enableSync, pull, syncAvailable } from '../lib/sync';
 import { loadMemFor, migrate, saveMem } from '../lib/storage';
+import type { CompanionModule } from '../lib/companionSeam';
 import { listRemoteProfiles, pullProfile, supaEmail, supaSession, type RemoteProfile } from '../lib/supa';
 import { deepClone, fmtDate } from '../lib/utils';
 import { ui, uiFor } from '../lang';
@@ -19,11 +20,13 @@ interface Props {
   onNewProfile: () => void;
   go: (view: string) => void;
   toast: (msg: string, err?: boolean) => void;
+  /** The optional extension, so a deleted profile takes whatever it was running with it. */
+  ext?: CompanionModule | null;
 }
 
 /** User management: local profiles on this device, each with its own memory and deck,
  *  plus optional cross-device sync via a token (server deployments). */
-export function Profiles({ mem, setMem, onSwitch, onNewProfile, go, toast }: Props) {
+export function Profiles({ mem, setMem, onSwitch, onNewProfile, go, toast, ext }: Props) {
   const S = ui();
   const [syncCode, setSyncCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -171,13 +174,13 @@ export function Profiles({ mem, setMem, onSwitch, onNewProfile, go, toast }: Pro
                 <span class="btn subtle" style="padding:6px 10px;font-size:11.5px;color:var(--red)" onClick={(e: Event) => {
                   e.stopPropagation();
                   if (confirm(S.profiles.deleteConfirm(p.name))) {
-                    const pm = loadMemFor(p.id);
-                    if (pm?.sync?.token && pm.sync.enabled) {
-                      void deleteRemote(pm.sync.token).then(ok => { if (!ok) toast(S.memory.serverWipeFailed, true); });
-                    }
-                    deleteProfile(p.id);
-                    const next = switchProfile(listProfiles()[0].id);
-                    if (next) onSwitch(next);
+                    // One teardown: this device, the server copy, and anything the
+                    // extension was running for this profile (lib/profiles removeProfile).
+                    void removeProfile(p.id, ext).then(r => {
+                      if (!r.remote || !r.extension) toast(S.memory.serverWipeFailed, true);
+                      const next = switchProfile(listProfiles()[0].id);
+                      if (next) onSwitch(next);
+                    });
                   }
                 }}>{S.common.del}</span>
               )}

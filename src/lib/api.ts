@@ -44,10 +44,13 @@ export const api = {
 
   async detect(): Promise<ApiInfo> {
     state.keySource = readKeySource();
-    if (location.protocol !== 'file:') {
+    // Two attempts, the second more patient: a deploy swap or a function cold start can
+    // eat the first probe, and a single miss used to strand the whole session in local
+    // mode with a "missing key" banner until the next full reload.
+    if (location.protocol !== 'file:') for (const patience of [3500, 8000]) {
       try {
         const ctl = new AbortController();
-        const to = setTimeout(() => ctl.abort(), 3500);
+        const to = setTimeout(() => ctl.abort(), patience);
         const r = await fetch('/api/health', { signal: ctl.signal });
         clearTimeout(to);
         if (r.ok) {

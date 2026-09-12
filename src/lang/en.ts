@@ -95,6 +95,7 @@ const ui: UIStrings = {
     imgChange: '🖼 Change the picture', imgAdd: '🖼 Add a picture', imgTitle: 'Add a picture to the card',
     newCards: (n: number) => `${n} new ${n === 1 ? 'card' : 'cards'}`, newVocab: 'New words', vocabHasCard: 'Card created', vocabMakeCard: 'Make the card', vocabRemoveCard: 'Remove cards', vocabCardsRemoved: (n: number) => `${n} ${n === 1 ? 'card' : 'cards'} removed.`,
     noAnalysis: 'No analysis for this conversation', duoImport: ' (Duolingo import)', continue: 'Continue',
+    analyseLater: 'The conversation is kept: Odile can still read it, even days later.', analyseNow: 'Analyse now',
     noticeTitle: 'What did Odile change?', noticeShow: 'See her version',
     tipsTitle: 'Tips', praiseTitle: 'What went well',
     noVocab: 'No new words from this conversation.',
@@ -215,7 +216,7 @@ const ui: UIStrings = {
     varGloss: {
       name: 'first name', native: 'native language', langue: 'target language', niveau: 'estimated level',
       competences: 'per-skill detail', confiance: 'estimate confidence', bande: 'A1–C2 band',
-      persona: 'Odile’s character', aujourdhui: 'today’s topic block', minutes: 'planned length',
+      identite: 'who the tutor is', persona: 'Odile’s character', aujourdhui: 'today’s topic block', minutes: 'planned length',
       objectifs: 'today’s targets', sondages: 'probed competencies', cap: 'period course',
       faits: 'personal facts', interets: 'interests', faiblesses: 'weak points', passe: 'past conversations'
     } as Record<string, string>,
@@ -269,7 +270,7 @@ const ui: UIStrings = {
     rhythm: 'Daily rhythm', callLength: 'Call length', cardsPerEvening: 'Cards per session', newOf: 'new per session',
     cardAudio: 'Card audio', yes: 'yes', no: 'no', introPhase: 'Getting to know you', skipPhase: 'Skip this phase',
     profileTitle: 'Profile', firstName: 'First name', targetLang: 'Target language', motherTongue: 'Native language',
-    odileStyle: 'Odile’s style', deadpan: 'Deadpan', warm: 'Warm', profilesSync: 'Profiles & sync', manage: 'Manage',
+    tutorPick: 'Who takes the call', tutorSwitchWarn: (name: string) => `Switching tutors resets the relationship. Your personal facts are erased; ${name} only gets a short handover note — level, gaps, direction — and will get to know you from scratch. Cards and level stay. Continue?`, odileStyle: 'Odile’s style', deadpan: 'Deadpan', warm: 'Warm', profilesSync: 'Profiles & sync', manage: 'Manage',
     voiceCall: 'Voice & call', voice: 'Voice', speed: 'Pace', patience: 'Listening patience',
     patienceHigh: 'high', patienceMid: 'medium', patienceLow: 'low', captions: 'Standing captions',
     callModel: 'Call model', callModelStd: 'standard', callModelMini: 'economy',
@@ -305,6 +306,16 @@ const ui: UIStrings = {
     notOnList: (email: string) => `${email} is not on the server list. Enter your own key: it is saved to your account and used for your conversations.`,
     saveContinue: 'Save and continue', changeAccount: 'Switch account',
     yourFirstName: 'Your first name', youLearn: 'You are learning', yourMotherTongue: 'Your native language',
+    yourTutor: 'Your tutor',
+    tutors: {
+      odile: 'Parisian, red beret, deadpan.',
+      marcel: 'Abidjan — former literature teacher, a proverb for everything.',
+      solene: 'Montreal — sound engineer, quick and teasing.',
+      nour: 'Brussels via Tunis — draws comics, calm and precise.',
+      bakary: 'Dakar — radio host, slam poet on Sundays.',
+      rosa: 'Marseille — retired proofreader, warm and precise.'
+    },
+    tutorNote: 'You can change tutors in Settings — the relationship then starts over.',
     yourLevel: 'Your level (your guess)',
     levelNote: 'The first three calls are for getting to know you: Odile checks this level.',
     accessLabel: 'Access', withCode: 'With the access code',
@@ -338,6 +349,45 @@ const ui: UIStrings = {
     start: 'Listen and guess', which: 'Which one did you hear?', replay: 'Listen again',
     score: (n: number, t: number) => `${n}/${t} correct`,
     good: 'Good ear.', meh: 'Worth training. Come back tomorrow.'
+  },
+  gram: {
+    /* the block on the day screen */
+    title: 'Grammar', kicker: 'Grammar of the day',
+    start: 'Take the course', minutes: '5 min',
+    sheet: 'The sheet', redo: 'Redo the course',
+    nothing: 'Nothing to work on right now.',
+    nothingSub: 'Your competency map is up to date. Come back after the next call.',
+    since: (ok: number, tries: number) => `${ok}/${tries} right since the course`,
+    fresh: 'The exercises will come back in your reviews.',
+    masteredToast: (label: string) => `${label}: learned.`,
+    nextUp: (label: string) => `Next: ${label}`,
+    /* the course itself */
+    making: 'Odile is preparing the course…',
+    fail: 'The course is not coming. Try again.',
+    check: 'Check', next: 'Next', gotIt: 'Got it',
+    answerHere: 'Your answer',
+    right: 'Right', wrong: 'Not quite',
+    accent: 'Almost — the accent is part of the word.',
+    was: (a: string) => `It was “${a}”`,
+    theRule: 'The rule', keep: 'Worth keeping',
+    finished: 'Course finished',
+    finishedSub: 'These exercises come back through your reviews until it sticks.',
+    /* the fiche */
+    pageOf: (i: number, n: number) => `${i} / ${n}`,
+    prev: 'Previous', traps: 'Traps',
+    makingSheet: 'Odile is writing the sheet…',
+    sheetFail: 'The detailed sheet is not coming. Here is the essential.',
+    /* inside a review sitting */
+    extra: (n: number) => ` + ${n} grammar`,
+    drill: 'Grammar',
+    /* settings */
+    share: 'Exercises in reviews', shareOff: 'None',
+    shareNote: (n: number, cards: number) => `About ${n} exercises on top of the ${cards} cards.`,
+    queue: 'To work on', done: 'Learned', skipped: 'Set aside',
+    up: 'Move up', down: 'Move down',
+    markDone: 'Mark as learned', reopen: 'Pick up again',
+    skip: 'Set aside', unskip: 'Bring back',
+    queueEmpty: 'Nothing queued.', manual: 'by hand'
   },
   rank: {
     of: (n: number, t: number) => `Rank ${n} of ${t}`,
@@ -381,7 +431,7 @@ const ui: UIStrings = {
 const template = `You are Odile, a conversation tutor for {{langue}}, on a voice call with your student. You are a real conversation partner, not an assistant.
 
 # Character
-Odile, French, in her thirties, red beret. She has lived in London for years and speaks impeccable English. {{persona}}
+{{identite}} {{persona}}
 
 # Student
 {{name}}, native language: {{native}}. Estimated level: {{niveau}} ({{competences}}). Confidence in the estimate: {{confiance}}.
@@ -460,6 +510,16 @@ export const en: LangPack = {
   ui,
   tutor: {
     template,
+    identities: {
+      odile: `Odile, French, in her thirties, red beret. She has lived in London for years and speaks impeccable English.`,
+      marcel: `Marcel, Ivorian, in his fifties, a former literature teacher from Abidjan; round glasses, a wax-print shirt, a proverb for every situation — often his own invention. Years of teaching in London gave him impeccable English.`,
+      solene: `Solène, Québécoise, twenty-nine, a sound engineer from Montreal; quick and teasing, at home in English after years of studio work across North America.`,
+      nour: `Nour, born in Tunis, lives in Brussels, in their thirties, draws comic books; neither he nor she — they — and "tutor" does fine. A calm voice, precise images, impeccable English from art-school years in London.`,
+      bakary: `Bakary, Senegalese, thirty-six, a radio host in Dakar and a slam poet on Sundays; short sentences that carry, one image per idea, a Wolof word translated in passing ("teranga" — hospitality). Years presenting for an English-language service gave him impeccable English.`,
+      rosa: `Rosa, from Marseille, sixty-one, a retired newspaper proofreader; warm and precise, a Marseille word translated in passing ("dégun" — nobody at all). Years on a London news desk gave her impeccable English.`
+    },
+    handover: (from: { name: string; gender: 'f' | 'm' | 'x' }) => `# Handover
+You are taking this student over from ${from.name}. Expect nothing beyond the file below — level, gaps, interests, direction. Their stories, who they are, what the two of them talked about: ${from.gender === 'f' ? 'she kept that to herself' : from.gender === 'm' ? 'he kept that to himself' : 'they kept that to themselves'}, as colleagues do. You have never met: introduce yourself plainly, get acquainted while you work, one question at a time, never an interrogation. Mention ${from.name} only if the student does, and briefly.`,
     persona: {
       deadpan: `Your delivery is deadpan and dry. Flat, calm intonation. Laconic, slightly world-weary, but quietly kind. Never gushing enthusiasm, never exclamation marks; your compliments are short and factual ("Not bad.", "Correct.", "Good."). Occasionally, at most once every few minutes, you allow yourself one very dry joke, delivered perfectly flat.`,
       warm: `Your tone is warm, calm and encouraging, without ever overdoing it. You smile with your voice, gently.`
@@ -488,7 +548,7 @@ The student does NOT speak {{langue}} yet, or barely three words. Adapt everythi
     interference: `# Interference
 The student is also learning: {{autres}}. When a word or pattern from those languages slips into their {{langue}}, flag the contrast in one word and give the {{langue}} form — no lecture.`,
     talkHog: (pct: number) => `# Warning: you are taking up all the room
-Across your last calls, YOU spoke ${pct} % of the words. That is the wrong way round: by the end of this call they must have talked more than you.
+Lately, YOU spoke ${pct} % of the words. That is the wrong way round: by the end of this call they must have talked more than you.
 - Halve your turns. One sentence is almost always enough.
 - Cut every repetition of what they just said: that is where half your words go.
 - Ask fewer questions and let the silence do the work.`,

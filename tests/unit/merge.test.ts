@@ -206,6 +206,46 @@ describe('applyAnalysis', () => {
   });
 });
 
+describe('the record written when the call ended', () => {
+  /** What app.tsx keepCall() writes the moment a call hangs up. */
+  const kept = (id: string, over: Record<string, unknown> = {}) => ({
+    id, date: '2026-09-08', at: '2026-09-08T08:13:00.000Z', topic: 'La chambre libre', source: 'causerie' as const,
+    minutes: 10, seconds: 593, transcript: meta().transcript, analysis: null, summary: 'Saved without analysis.',
+    ...over
+  });
+
+  it('the analysis fills that record in instead of adding a second one, keeping its day and its hour', () => {
+    const m = blankMem();
+    m.sessions.push(kept('sess-kept', { costs: [{ kind: 'realtime' as const, model: 'gpt-realtime-2.1', usd: 0.42 }] }));
+    const rec = applyAnalysis(m, baseAnalysis({ hauptpunkt: 'Il a parlé de sa chambre.' }), {
+      ...meta(593), id: 'sess-kept', date: '2026-09-08'
+    });
+    expect(m.sessions).toHaveLength(1);
+    expect(rec.id).toBe('sess-kept');
+    expect(rec.at).toBe('2026-09-08T08:13:00.000Z');   // the hour of the call, not of the analysis
+    expect(rec.date).toBe('2026-09-08');
+    expect(rec.analysis?.hauptpunkt).toBe('Il a parlé de sa chambre.');
+    expect(rec.summary).toContain('Il a parlé de sa chambre.');
+    expect(m.sessions[0]).toBe(rec);
+  });
+
+  it('an analysis run days later dates its facts to the day of the call', () => {
+    const m = blankMem();
+    m.sessions.push(kept('sess-late'));
+    applyAnalysis(m, baseAnalysis({ facts: [{ text: 'Il loue une chambre.', category: 'alltag' as const }] }), {
+      ...meta(593), id: 'sess-late', date: '2026-09-08'
+    });
+    expect(m.facts[0]).toMatchObject({ firstSaid: '2026-09-08', lastSaid: '2026-09-08' });
+  });
+
+  it('without an id it still appends, the way an import does', () => {
+    const m = blankMem();
+    applyAnalysis(m, baseAnalysis(), meta());
+    expect(m.sessions).toHaveLength(1);
+    expect(m.sessions[0].date).toBe(todayISO());
+  });
+});
+
 describe('memory type sanity', () => {
   it('blankMem satisfies the Memory shape', () => {
     const m: Memory = blankMem();

@@ -98,6 +98,7 @@ export const deUi: UIStrings = {
     imgChange: '🖼 Bild ändern', imgAdd: '🖼 Bild hinzufügen', imgTitle: 'Der Karte ein Bild geben',
     newCards: (n: number) => `${n} ${n === 1 ? 'neue Karte' : 'neue Karten'}`, newVocab: 'Neue Wörter', vocabHasCard: 'Karte erstellt', vocabMakeCard: 'Karte erstellen', vocabRemoveCard: 'Karten löschen', vocabCardsRemoved: (n: number) => `${n} ${n === 1 ? 'Karte' : 'Karten'} gelöscht.`,
     noAnalysis: 'Keine Auswertung zu diesem Gespräch', duoImport: ' (Duolingo-Import)', continue: 'Weiter',
+    analyseLater: 'Das Gespräch ist gespeichert: Odile kann es auch Tage später noch auswerten.', analyseNow: 'Jetzt auswerten',
     noticeTitle: 'Was hat Odile geändert?', noticeShow: 'Ihre Version zeigen',
     tipsTitle: 'Hinweise', praiseTitle: 'Das lief gut',
     noVocab: 'Keine neuen Wörter aus diesem Gespräch.',
@@ -218,7 +219,7 @@ export const deUi: UIStrings = {
     varGloss: {
       name: 'Vorname', native: 'Muttersprache', langue: 'Zielsprache', niveau: 'geschätztes Niveau',
       competences: 'Detail je Fertigkeit', confiance: 'Verlässlichkeit der Schätzung', bande: 'Stufe A1–C2',
-      persona: 'Odiles Charakter', aujourdhui: 'Themenblock des Tages', minutes: 'geplante Dauer',
+      identite: 'wer der Tutor ist', persona: 'Odiles Charakter', aujourdhui: 'Themenblock des Tages', minutes: 'geplante Dauer',
       objectifs: 'Tagesziele', sondages: 'abgefragte Kompetenzen', cap: 'Kurs der Periode',
       faits: 'persönliche Fakten', interets: 'Interessen', faiblesses: 'Schwächen', passe: 'frühere Gespräche'
     } as Record<string, string>,
@@ -272,7 +273,7 @@ export const deUi: UIStrings = {
     rhythm: 'Tagesrhythmus', callLength: 'Gesprächsdauer', cardsPerEvening: 'Karten pro Runde', newOf: 'davon neue',
     cardAudio: 'Kartenaudio', yes: 'ja', no: 'nein', introPhase: 'Kennenlernen', skipPhase: 'Phase überspringen',
     profileTitle: 'Profil', firstName: 'Vorname', targetLang: 'Zielsprache', motherTongue: 'Muttersprache',
-    odileStyle: 'Odiles Art', deadpan: 'Trocken', warm: 'Warmherzig', profilesSync: 'Profile & Synchronisierung', manage: 'Verwalten',
+    tutorPick: 'Wer abnimmt', tutorSwitchWarn: (name: string) => `Ein Tutorwechsel setzt die Beziehung auf null. Deine persönlichen Fakten werden gelöscht; ${name} bekommt nur eine kurze Übergabenotiz — Niveau, Lücken, Kurs — und lernt dich von vorn kennen. Karten und Niveau bleiben. Fortfahren?`, odileStyle: 'Odiles Art', deadpan: 'Trocken', warm: 'Warmherzig', profilesSync: 'Profile & Synchronisierung', manage: 'Verwalten',
     voiceCall: 'Stimme & Gespräch', voice: 'Stimme', speed: 'Tempo', patience: 'Geduld beim Zuhören',
     patienceHigh: 'groß', patienceMid: 'mittel', patienceLow: 'klein', captions: 'Dauerhafte Untertitel',
     callModel: 'Gesprächsmodell', callModelStd: 'Standard', callModelMini: 'sparsam',
@@ -301,13 +302,23 @@ export const deUi: UIStrings = {
   },
   onboarding: {
     heroLine: 'Bonjour. Wir werden wohl miteinander reden. Gut.',
-    title1: 'Die Tutorin,', title2: 'die sich an dich erinnert.',
+    title1: 'Jemand,', title2: 'der sich an dich erinnert.',
     sub: 'Jeden Tag ein Gespräch, jeden Abend ein paar Karten. Was beim Sprechen hakt, landet von selbst in der Wiederholung. Dein Niveau zeichnet sich von A1 bis C2 ab.',
     google: 'Mit Google fortfahren', connectedAs: 'Verbunden:', signInFirst: 'Melde dich zuerst mit Google an.',
     yourKey: 'Dein OpenAI-Schlüssel',
     notOnList: (email: string) => `${email} steht nicht auf der Serverliste. Gib deinen eigenen Schlüssel ein: er wird in deinem Konto gespeichert und für deine Gespräche verwendet.`,
     saveContinue: 'Speichern und weiter', changeAccount: 'Konto wechseln',
     yourFirstName: 'Dein Vorname', youLearn: 'Du lernst', yourMotherTongue: 'Deine Muttersprache',
+    yourTutor: 'Wer dich unterrichtet',
+    tutors: {
+      odile: 'Pariserin, rotes Barett, trocken.',
+      marcel: 'Abidjan — früher Literaturlehrer, ein Sprichwort für alles.',
+      solene: 'Montreal — Tontechnikerin, schnell und neckisch.',
+      nour: 'Brüssel via Tunis — zeichnet Comics, ruhig und präzise.',
+      bakary: 'Dakar — Radiomann, sonntags Slam-Poet.',
+      rosa: 'Marseille — Korrektorin im Ruhestand, warm und präzise.'
+    },
+    tutorNote: 'Du kannst in den Einstellungen wechseln — die Beziehung beginnt dann von vorn.',
     yourLevel: 'Dein Niveau (nach deinem Gefühl)',
     levelNote: 'Die ersten drei Gespräche dienen dem Kennenlernen: Odile überprüft dieses Niveau.',
     accessLabel: 'Zugang', withCode: 'Mit dem Zugangscode',
@@ -341,6 +352,45 @@ export const deUi: UIStrings = {
     start: 'Anhören und raten', which: 'Welches hast du gehört?', replay: 'Nochmal anhören',
     score: (n: number, t: number) => `${n}/${t} richtig`,
     good: 'Gutes Ohr.', meh: 'Wird noch. Komm morgen wieder.'
+  },
+  gram: {
+    /* the block on the day screen */
+    title: 'Grammatik', kicker: 'Grammatik des Tages',
+    start: 'Kurs machen', minutes: '5 Min',
+    sheet: 'Das Merkblatt', redo: 'Kurs wiederholen',
+    nothing: 'Gerade nichts zu üben.',
+    nothingSub: 'Deine Kompetenzkarte ist aktuell. Schau nach dem nächsten Gespräch wieder vorbei.',
+    since: (ok: number, tries: number) => `${ok}/${tries} richtig seit dem Kurs`,
+    fresh: 'Die Übungen kommen in deinen Wiederholungen wieder.',
+    masteredToast: (label: string) => `${label}: sitzt.`,
+    nextUp: (label: string) => `Als Nächstes: ${label}`,
+    /* the course itself */
+    making: 'Odile bereitet den Kurs vor…',
+    fail: 'Der Kurs kommt nicht an. Versuch es nochmal.',
+    check: 'Prüfen', next: 'Weiter', gotIt: 'Verstanden',
+    answerHere: 'Deine Antwort',
+    right: 'Richtig', wrong: 'Nicht ganz',
+    accent: 'Fast — der Akzent gehört zum Wort.',
+    was: (a: string) => `Es hieß „${a}“`,
+    theRule: 'Die Regel', keep: 'Zum Mitnehmen',
+    finished: 'Kurs beendet',
+    finishedSub: 'Diese Übungen tauchen in deinen Wiederholungen wieder auf, bis es sitzt.',
+    /* the fiche */
+    pageOf: (i: number, n: number) => `${i} / ${n}`,
+    prev: 'Zurück', traps: 'Fallen',
+    makingSheet: 'Odile schreibt das Merkblatt…',
+    sheetFail: 'Das ausführliche Merkblatt kommt nicht an. Hier das Wichtigste.',
+    /* inside a review sitting */
+    extra: (n: number) => ` + ${n} Grammatik`,
+    drill: 'Grammatik',
+    /* settings */
+    share: 'Übungen in den Wiederholungen', shareOff: 'Keine',
+    shareNote: (n: number, cards: number) => `Etwa ${n} Übungen zusätzlich zu den ${cards} Karten.`,
+    queue: 'Zu üben', done: 'Sitzt', skipped: 'Beiseite',
+    up: 'Nach oben', down: 'Nach unten',
+    markDone: 'Als gekonnt markieren', reopen: 'Wieder aufnehmen',
+    skip: 'Beiseitelegen', unskip: 'Zurückholen',
+    queueEmpty: 'Nichts in der Warteschlange.', manual: 'von Hand'
   },
   rank: {
     of: (n: number, t: number) => `Rang ${n} von ${t}`,

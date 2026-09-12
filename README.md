@@ -54,10 +54,16 @@ src/
     tts.ts                  card audio (gpt-4o-mini-tts), cached object URLs
     seed.ts                 seeded starter memory + 12-card deck (test/debug fixture)
     storage.ts              per-profile localStorage persistence + v1→v2 migration
+    grammar.ts              which grammar concept to teach next (worst gap at or below the
+                            learner's band), when it counts as learned, and which exercises
+                            go into tonight's sitting
+    course.ts               writes the five-minute discovery lesson, its exercise bank and
+                            its detailed fiche; cached per concept, never on the critical path
     cefr.ts  topics.ts  langs.ts  utils.ts
-  components/               Avatar (Odile), charts (CEFR ladder, history), icons, Toast
+  components/               Avatar (Odile), charts (CEFR ladder, history), icons, Toast,
+                            Viz (the four grammar diagrams), DrillCard
   views/                    Onboarding, Today, Call, Review, ReviewSession, Cards,
-                            MemoryView, Profiles, Settings
+                            MemoryView, Grammar, Profiles, Settings
 netlify/functions/          serverless surface (plain .mjs, no build step)
   health.mjs                GET /api/health → mode/auth status
   rt-token.mjs              POST /api/rt-token → mints ephemeral Realtime client secrets
@@ -78,6 +84,18 @@ note per word goal when it appears on screen → hang up → `analysis.ts` retur
 folds it into `Memory` and `srs.ts` turns it into deck cards, as many as `budget.ts`
 allows → `Review` shows transcript + new cards → `ReviewSession` runs its 18 cards with
 SM-2 grading and TTS, twice a day → streak counts both halves of the day.
+
+The grammar strand runs off the same competency matrix. `grammar.ts` ranks the map's
+thirty-three French grammar cells — failed first, then mixed, then never observed, always
+at or below the learner's own band and foundations before frontier — and the day screen
+offers the top one as a five-minute lesson. The lesson is written in discovery order: the
+examples come first, the learner works the pattern out, and only then is the rule named.
+Taking it puts that concept into rotation, and about a quarter as many micro-exercises as
+there are cards are threaded through the following review sittings — added to the cards,
+never taken from them, so the deck never loses a review to it. A few days of answering them
+well retires the concept and the next one comes up; after that the button opens the
+concept's fiche instead, as many pages as it needs. The queue can be reordered, skipped or
+marked done by hand in the settings. French only for now.
 
 Two runtime modes, detected via `/api/health`: **server** (deployed; OpenAI key lives in
 Netlify env vars, requests authorized by access code or Google ID token) and **local**

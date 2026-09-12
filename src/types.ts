@@ -66,6 +66,133 @@ export type CompStatus = 'ok' | 'ko' | 'partial';
 /** One cell of the A1–C2 competency matrix; absence of an entry = no data yet (grey). */
 export interface CompEntry { status: CompStatus; lastSeen: string; evidence?: string }
 
+/* ---------- grammar courses (a matrix cell taught, drilled and judged) ---------- */
+
+/** A drawing a course step or a fiche page may ask for. A fixed menu of four rather than
+ *  free-form SVG: the model picks a shape and fills its fields, so whatever comes back can
+ *  always be rendered, and always in the app's own hand. `none` is the usual answer — a
+ *  diagram that only restates the sentence under it is noise.
+ *
+ *  Every field is present on every viz (the strict JSON schema demands it); the ones the
+ *  chosen `kind` does not use come back empty. */
+export interface GrammarViz {
+  kind: 'none' | 'timeline' | 'table' | 'chunks' | 'split';
+  /** One line under the drawing saying what to look at. */
+  caption: string;
+  /** timeline: spans on a 0–10 axis of time, left to right. `len` 0 draws a point. */
+  marks: { at: number; len: number; label: string; tone: 'a' | 'b' }[];
+  /** table: the header row. */
+  cols: string[];
+  /** table: one row per line, `head` being its label column. */
+  rows: { head: string; cells: string[] }[];
+  /** table: cells to highlight, each "row,col" 0-based into `rows`/`cols`. */
+  hi: string[];
+  /** chunks: the slots of a pattern in order, e.g. ne · verbe · pas. */
+  slots: { label: string; text: string; tone: 'a' | 'b' | 'c' }[];
+  /** split: the two sides of a contrast. */
+  left: { title: string; items: string[] };
+  right: { title: string; items: string[] };
+}
+
+/** One screen of a mini-course. `discover` and `choice` are multiple choice (discover asks
+ *  what the examples have in common, before any rule has been named); `gap` is typed;
+ *  `rule` and `recap` are the payoff screens and have nothing to answer. */
+export type CourseStepKind = 'discover' | 'choice' | 'gap' | 'rule' | 'recap';
+
+export interface CourseStep {
+  kind: CourseStepKind;
+  /** The question, or the heading on a rule screen. Support language. */
+  prompt: string;
+  /** Evidence shown above the question: target-language lines with a gloss. */
+  examples: { t: string; gloss: string }[];
+  viz: GrammarViz;
+  /** discover/choice: the options. Empty on other kinds. */
+  options: string[];
+  /** 0-based index of the right option. */
+  correct: number;
+  /** gap: the sentence carrying exactly one ___. */
+  text: string;
+  /** gap: what fills it. */
+  answer: string;
+  /** rule/recap: the rule in at most five short lines. */
+  lines: string[];
+  /** Shown once the step is answered, or straight away on a rule screen. */
+  explain: string;
+}
+
+/** One micro-exercise interleaved into a review sitting once its concept has been taught. */
+export interface GrammarDrill {
+  /** Competency id this exercise belongs to. */
+  topic: string;
+  kind: 'gap' | 'choice';
+  /** Short support-language cue: what to produce. */
+  prompt: string;
+  /** The sentence, carrying exactly one ___. */
+  text: string;
+  /** choice: three short options. Empty for a typed gap. */
+  options: string[];
+  answer: string;
+  /** One line, shown after answering. */
+  explain: string;
+}
+
+/** A generated mini-course for one competency cell, with the drill bank it feeds. */
+export interface GrammarCourse {
+  /** The competency id this teaches. */
+  id: string;
+  /** Title in the target language. */
+  title: string;
+  /** One line on why this is worth five minutes. Support language. */
+  why: string;
+  steps: CourseStep[];
+  bank: GrammarDrill[];
+  madeAt: string;
+}
+
+/** The detailed fiche the grammar button opens once its course has been done: as many
+ *  pages as the concept needs. Cached beside the course rather than carried in the memory —
+ *  the blob is synced whole on every save, has no ceiling of its own, and a failed save is
+ *  swallowed silently (lib/storage), so a few kB per concept is the wrong thing to put
+ *  there when regenerating one costs a fraction of a cent. */
+export interface GrammarGuide {
+  id: string;
+  title: string;
+  pages: {
+    title: string;
+    lines: string[];
+    examples: { t: string; gloss: string }[];
+    viz: GrammarViz;
+    traps: string[];
+  }[];
+  madeAt: string;
+}
+
+/** What has happened to one grammar concept since its course was done. */
+export interface GrammarTopic {
+  /** The day the mini-course was first finished. */
+  courseAt: string;
+  /** The last redo, when there has been one. */
+  redoneAt?: string;
+  /** Per-day drill tallies since the course, oldest first (capped at DRILL_DAYS). */
+  days: { d: string; ok: number; ko: number }[];
+  /** Set on the day the concept was judged mastered; absent while it is still drilling. */
+  masteredAt?: string;
+  /** Mastery was declared in the settings rather than earned. */
+  manual?: 1;
+}
+
+/** Everything about the grammar strand that is worth SYNCING: which concepts have been
+ *  taught, how their drilling is going, and the order the student put them in. Deliberately
+ *  small — the courses and fiches themselves are cached per device. */
+export interface GrammarState {
+  /** Competency id → what has happened to it. */
+  topics: Record<string, GrammarTopic>;
+  /** Competency ids the student moved to the front of the queue, in their order. */
+  order: string[];
+  /** Competency ids never to propose. */
+  skipped: string[];
+}
+
 /** Configuration of one upcoming/running call. */
 export interface CallSession {
   topic: string;
@@ -360,6 +487,10 @@ export interface Settings {
   speakAnswers?: boolean;
   /** Offer the 4/3/2 fluency retell after the daily call (optional exercise). */
   retell?: boolean;
+  /** Share of a review sitting given over to grammar micro-exercises, in percent. They are
+   *  ADDED to the cards rather than taken from them — a sitting of sixteen becomes twenty —
+   *  so this never costs the deck a review. 0 turns them off; unset = GRAMMAR_SHARE. */
+  grammarShare?: number;
 }
 
 export interface Profile {
@@ -369,6 +500,11 @@ export interface Profile {
   /** Native language, used inside the tutor briefing and analysis. */
   native: 'de' | 'en';
   persona: Persona;
+  /** Which tutor takes the calls (lib/tutors.ts). Unset = Odile, as it always was. */
+  tutor?: string;
+  /** The companion persona last applied to `tutor` by the extension's sync, so a manual
+   *  choice in the settings is respected instead of fought on every /me. */
+  tutorSynced?: string;
   /** Started as an absolute beginner ("0"): the tutor leads in the native language
    *  and teaches survival phrases until the level clears A1. */
   a0?: boolean;
@@ -419,7 +555,16 @@ export interface Memory {
   comp: Record<string, CompEntry>;
   /** Library ids the user pinned as content of the next call (cleared after it). */
   pinned: string[];
+  /** Grammar being taught outright: which concepts have had their mini-course, how their
+   *  drills are going, and the order the student put them in. Absent until the first
+   *  course is finished (see lib/grammar). */
+  grammar?: GrammarState;
   checkins: CheckinState;
+  /** Set when the tutor changed hands (lib/tutors.switchTutor): who handed over and on
+   *  which day. The old tutor's personal knowledge is gone by then; the briefing carries
+   *  a bare-bones handover note for the first few calls, and conversations from before
+   *  `date` are never referenced again. */
+  handover?: { from: string; date: string };
   xp: number;
   /** `repairs` are banked missed days (max RANK/streak cap): one earned per five
    *  uninterrupted days, spent automatically to bridge a gap. */

@@ -8,9 +8,11 @@ import {
   hasOwnKey, isAllowlisted, listRemoteProfiles, pullProfile, saveOwnKey,
   signInGoogle, signOut, supaEmail, supaSession
 } from '../lib/supa';
-import { Odile } from '../components/Avatar';
+import { TutorFace } from '../components/Avatar';
 import { setUiLang, ui, uiLangCode, type UiLangCode } from '../lang';
 import { seedA0 } from '../lib/a0';
+import { chooseTutor, TUTORS, type TutorKey } from '../lib/tutors';
+import type { CompanionModule } from '../lib/companionSeam';
 
 /** Signup runs in a SUPPORT language (browser locale by default, switchable): a German
  *  Spanish-learner must be able to read the form. The immersive target-language UI only
@@ -25,8 +27,11 @@ interface Props {
   /** true on a fresh device: after login, jump straight into the last-used profile. */
   autoResume: boolean;
   toast: (msg: string, err?: boolean) => void;
-  onDone: (mem: Memory) => void;
+  onDone: (mem: Memory, opts?: { openExtension?: boolean }) => void;
   onCancel?: () => void;
+  /** The private extension, when this build and account carry one: it contributes an
+   *  opt-in card to the form, and a yes routes to its page after signup. */
+  ext?: CompanionModule | null;
 }
 
 /** Supabase login flow: Google only. After login, non-allowlisted accounts are asked
@@ -34,7 +39,7 @@ interface Props {
  *  opens directly (or the new-profile form when the account has none). */
 type Phase = 'signedout' | 'checking' | 'needkey' | 'newprofile';
 
-export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, onCancel }: Props) {
+export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, onCancel, ext }: Props) {
   const supa = apiInfo.auth === 'supabase';
   const S = ui();
   const [name, setName] = useState('');
@@ -42,6 +47,10 @@ export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, on
   const [native, setNative] = useState<Memory['profile']['native']>('de');
   const [lvl, setLvl] = useState<CEFRBand>('A1');
   const [a0, setA0] = useState(false); // absolute beginner: knows the language not at all
+  // No default on purpose: the form presents four equals and the student picks one;
+  // nobody is "the" tutor until chosen. The start button waits for the choice.
+  const [tutor, setTutorKey] = useState<TutorKey | null>(null);
+  const [wantExt, setWantExt] = useState(false);
   const [, bump] = useState(0);
   const switchUi = (code: UiLangCode) => { setUiLang(code); bump(n => n + 1); };
   const [access, setAccess] = useState<KeySource>(apiInfo.mode === 'server' ? apiInfo.keySource : 'own');
@@ -142,7 +151,8 @@ export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, on
       mem.cefr.overall = idx;
       (Object.keys(mem.cefr.skills) as (keyof typeof mem.cefr.skills)[]).forEach(k => (mem.cefr.skills[k] = idx));
       if (a0) seedA0(mem, target, native);
-      onDone(mem);
+      chooseTutor(mem, tutor ?? 'odile');
+      onDone(mem, { openExtension: wantExt });
     } catch (e) {
       toast(S.onboarding.error((e as Error).message), true);
     }
@@ -166,12 +176,21 @@ export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, on
           {onCancel && <button class="btn subtle" onClick={onCancel}>{S.common.cancel}</button>}
         </div>
       </div>
-      <div style="display:flex;gap:16px;align-items:flex-end;margin-top:26px">
-        <div style="width:108px;flex-shrink:0"><Odile state="idle" /></div>
-        <div class="hero-bubble" style="margin-bottom:10px">
-          <span class="fr">{S.onboarding.heroLine}</span>
+      {tutor ? (
+        <div style="display:flex;gap:16px;align-items:flex-end;margin-top:26px">
+          <div style="width:108px;flex-shrink:0"><TutorFace state="idle" tutor={tutor} /></div>
+          <div class="hero-bubble" style="margin-bottom:10px">
+            <span class="fr">{S.onboarding.heroLine}</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style="display:flex;gap:6px;align-items:flex-end;margin-top:26px">
+          {/* six of them now: each face gives ground evenly rather than overflowing a phone */}
+          {Object.keys(TUTORS).map(k => (
+            <div key={k} style="flex:0 1 62px;min-width:44px"><TutorFace state="idle" tutor={k as TutorKey} /></div>
+          ))}
+        </div>
+      )}
       <h1>{S.onboarding.title1}<br />{S.onboarding.title2}</h1>
       <p class="muted" style="line-height:1.55;margin:6px 0 0">
         {S.onboarding.sub}
@@ -228,6 +247,24 @@ export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, on
       {supa && <div class="tiny" style="margin:-6px 0 14px">{S.onboarding.connectedAs} {supaEmail()}</div>}
 
       <div class="field">
+        <label>{S.onboarding.yourTutor}</label>
+        <div class="accesscards" style="grid-template-columns:1fr 1fr">
+          {Object.values(TUTORS).map(t => (
+            <button key={t.key} class={'accesscard ' + (tutor === t.key ? 'on' : '')} onClick={() => setTutorKey(t.key)}>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="width:34px;height:34px;border-radius:50%;overflow:hidden;background:var(--cream);display:flex;align-items:flex-end;flex-shrink:0">
+                  <span style="width:100%;height:100%;margin-bottom:-3px;display:block"><TutorFace tutor={t.key} /></span>
+                </span>
+                <div class="t">{t.name}</div>
+              </div>
+              <div class="d">{S.onboarding.tutors[t.key]}</div>
+            </button>
+          ))}
+        </div>
+        <div class="tiny" style="margin-top:7px">{S.onboarding.tutorNote}</div>
+      </div>
+
+      <div class="field">
         <label>{S.onboarding.yourFirstName}</label>
         <input value={name} onInput={e => setName((e.target as HTMLInputElement).value)} />
       </div>
@@ -260,6 +297,10 @@ export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, on
         <div class="tiny" style="margin-top:7px">{a0 ? S.onboarding.a0Hint : S.onboarding.levelNote}</div>
       </div>
 
+      {/* The extension's card names the tutor chosen above: whoever takes the calls is
+          whoever writes between them, so the card follows the choice as it changes. */}
+      {ext?.OnboardingCard && <ext.OnboardingCard enabled={wantExt} onChange={setWantExt} tutor={tutor} />}
+
       {!supa && needsAccess && (
         <div class="field">
           <label>{S.onboarding.accessLabel}</label>
@@ -290,7 +331,7 @@ export function Onboarding({ apiInfo, needsAccess, autoResume, toast, onDone, on
         </div>
       )}
 
-      <button class="btn primary big" style="margin-top:22px" disabled={busy} onClick={start}>
+      <button class="btn primary big" style="margin-top:22px" disabled={busy || !tutor} onClick={start}>
         {busy ? S.common.moment : S.onboarding.go}
       </button>
     </div>

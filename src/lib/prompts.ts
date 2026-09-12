@@ -1,11 +1,12 @@
 import type { CallSession, LangCode, Memory } from '../types';
 import { pack, PACKS, ui } from '../lang';
+import { handoverActive, tutorOf } from './tutors';
 import { band, idxLvl } from './cefr';
 import { probeTargets } from './competencies';
 import { inIntroPhase, introCallsDone } from './gamify';
 import { LANGS } from './langs';
 import { portrait, portraitText } from './portrait';
-import { recentTutorShare, TALK_HIGH } from './talk';
+import { talkAlert } from './talk';
 import { listProfiles, profileLang } from './profiles';
 
 /** 1-based number of the current intro call, clamped to 3. */
@@ -19,7 +20,7 @@ const introN = (mem: Memory): number => Math.min(introCallsDone(mem) + 1, 3);
 
 export const TEMPLATE_VARS = [
   'name', 'native', 'langue', 'niveau', 'competences', 'confiance', 'bande',
-  'persona', 'aujourdhui', 'minutes', 'objectifs', 'sondages', 'cap', 'faits', 'interets',
+  'identite', 'persona', 'aujourdhui', 'minutes', 'objectifs', 'sondages', 'cap', 'faits', 'interets',
   'faiblesses', 'passe'
 ] as const;
 
@@ -50,14 +51,17 @@ export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 
   const interf = clash.length
     ? resolveTemplate(tp.interference, { langue, autres: clash.map(l => LANGS[l].name).join(', ') }) + '\n\n'
     : '';
-  // She out-talked the student across the last few calls. Injected here rather than written
+  // She out-talked the student — last call, or across the last few. Injected here rather than written
   // into the template so a student who has edited their own briefing still gets it, and so
   // it disappears again the moment the ratio comes back — a standing rule nobody is
   // breaking any more is just noise in a two-thousand-word prompt.
-  const share = recentTutorShare(mem);
-  const hog = share !== null && share > TALK_HIGH
-    ? tp.talkHog(Math.round(share * 100)) + '\n\n'
-    : '';
+  const share = talkAlert(mem);
+  const hog = share !== null ? tp.talkHog(Math.round(share * 100)) + '\n\n' : '';
+  // The tutor changed hands recently: a bare-bones handover note opens the day block for
+  // the first few calls. Read off the RAW pack — the tutor rewrite would rename the old
+  // tutor into the new one mid-note.
+  const ho = handoverActive(mem);
+  const passation = ho ? PACKS[p.target]?.tutor.handover({ name: ho.from.name, gender: ho.from.gender }) + '\n\n' : '';
   const vars: Record<string, string> = {
     name: p.name || tp.fallbacks.student,
     native,
@@ -65,10 +69,13 @@ export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 
     niveau: est ? tp.levelBeingEstablished.niveau : idxLvl(mem.cefr.overall),
     confiance: est ? tp.levelBeingEstablished.confiance : Math.round((mem.cefr.confidence || 0.4) * 100) + ' %',
     bande: band(mem.cefr.overall),
+    // Who takes the call: the identity line of the profile's tutor, in the target
+    // language. The pack itself is already rewritten for that tutor by lang/index.
+    identite: tp.identities[tutorOf(mem).key] || tp.identities.odile || '',
     competences: (['grammar', 'vocabulary', 'fluency', 'comprehension'] as const)
       .map(k => `${P.ui.skills[k]} : ${idxLvl(mem.cefr.skills[k])}`).join(', '),
     persona: tp.persona[p.persona === 'warm' ? 'warm' : 'deadpan'],
-    aujourdhui: a0 + interf + hog + (sess.mode === 'intro'
+    aujourdhui: passation + a0 + interf + hog + (sess.mode === 'intro'
       ? tp.todayIntro(introN(mem))
       : tp.todayTopic(sess.topicFr || sess.topic) + (sess.topicTags?.length ? tp.todayFields(sess.topicTags.join(', ')) : '')),
     minutes: String(sess.minutes ?? mem.settings.minutesHint ?? 4),
@@ -81,7 +88,10 @@ export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 
     faits: portraitText(portrait(mem), tp.facts),
     interets: (mem.interests ?? []).slice().sort((a, b) => b.weight - a.weight).slice(0, 5).map(i => '- ' + i.label).join('\n') || tp.fallbacks.noInterests,
     faiblesses: (mem.weaknesses ?? []).filter(w => w.status !== 'resolved').slice(0, 8).map(w => '- ' + w.label).join('\n') || tp.fallbacks.noWeaknesses,
-    passe: (mem.sessions ?? []).filter(s => s.summary).slice(-3).map(s => `- ${s.date} « ${s.topic} » : ${s.summary}`).join('\n') || tp.fallbacks.firstCall
+    // Conversations from before a handover belong to the old tutor and are never
+    // referenced again — the new one wasn't there.
+    passe: (mem.sessions ?? []).filter(s => s.summary && (!mem.handover || s.date >= mem.handover.date))
+      .slice(-3).map(s => `- ${s.date} « ${s.topic} » : ${s.summary}`).join('\n') || tp.fallbacks.firstCall
   };
   return resolveTemplate(mem.tutorTemplate || tp.template, vars);
 }
@@ -93,9 +103,12 @@ export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 
 export function greetingPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 'topicFr' | 'mode' | 'minutes'>): string {
   const tp = pack(mem.profile.target).tutor;
   const name = mem.profile.name || tp.fallbacks.student;
-  return sess.mode === 'intro'
-    ? tp.greetIntro(name, introN(mem))
-    : tp.greetDaily(name, sess.topicFr || sess.topic, sess.minutes ?? mem.settings.minutesHint ?? 8);
+  if (sess.mode === 'intro') return tp.greetIntro(name, introN(mem));
+  // A new tutor's very first call opens like a first meeting — they introduce
+  // themselves — because for these two people it is one.
+  const ho = handoverActive(mem);
+  if (ho && ho.calls === 0) return tp.greetIntro(name, 1);
+  return tp.greetDaily(name, sess.topicFr || sess.topic, sess.minutes ?? mem.settings.minutesHint ?? 8);
 }
 
 /** Glosses of the template variables for the briefing editor. */

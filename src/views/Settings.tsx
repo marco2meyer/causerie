@@ -9,10 +9,17 @@ import {
   saveOwnKey, signInGoogle, signOut,
   supaEmail, supaSession
 } from '../lib/supa';
-import { deepClone } from '../lib/utils';
+import { switchTutor, TUTORS, tutorOf } from '../lib/tutors';
+import { compById } from '../lib/competencies';
+import {
+  drillCount, GRAMMAR_SHARE, grammarOf, grammarQueue, grammarState, learningTopics
+} from '../lib/grammar';
+import { TutorFace } from '../components/Avatar';
+import { deepClone, todayISO } from '../lib/utils';
 import { BUILD, buildTime, deployedBuild, isStaleBuild, versionLabel } from '../lib/version';
 import { dailyReviewCapacity, newPerSession, sessionsPerDay, sustainableNewPerDay } from '../lib/budget';
 import { ui, uiLocale } from '../lang';
+import type { CompanionModule } from '../lib/companionSeam';
 
 /** Listening patience, most patient first. The value is OpenAI's `eagerness`, which runs the
  *  other way round: 'low' eagerness means the model waits, which is what "patience: high"
@@ -27,9 +34,11 @@ interface Props {
   refreshApi: () => void;
   go: (view: string) => void;
   toast: (msg: string, err?: boolean) => void;
+  /** Optional extension module, when this build carries one. */
+  ext?: CompanionModule | null;
 }
 
-export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast }: Props) {
+export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast, ext }: Props) {
   const S = ui();
   const upd = (fn: (m: Memory) => void) => {
     const m = deepClone(mem);
@@ -250,6 +259,8 @@ export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast }: Props)
         )}
       </div>
 
+      {mem.profile.target === 'fr' && <GrammarSettings mem={mem} upd={upd} />}
+
       <div class="card">
         <div style="font-family:var(--disp);font-weight:800;font-size:17px;margin-bottom:4px">{S.settings.profileTitle}</div>
         <div class="kv"><span class="k">{S.settings.firstName}</span>
@@ -267,6 +278,27 @@ export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast }: Props)
             onChange={e => upd(m => (m.profile.native = (e.target as HTMLSelectElement).value as Memory['profile']['native']))}>
             {(['de', 'en'] as const).map(k => <option key={k} value={k}>{S.settings.natives[k]}</option>)}
           </select>
+        </div>
+        <div class="kv"><span class="k">{S.settings.tutorPick}</span>
+          <div class="pills">
+            {Object.values(TUTORS).map(t => (
+              <button key={t.key} class={'pill ' + (tutorOf(mem).key === t.key ? 'on' : '')}
+                style="display:flex;align-items:center;gap:6px;padding:3px 10px 3px 4px"
+                onClick={() => void (async () => {
+                  if (tutorOf(mem).key === t.key) return;
+                  if (!confirm(S.settings.tutorSwitchWarn(t.name))) return;
+                  // The extension, when there is one, gets a say: it may have a thread of
+                  // its own tied to the old tutor and asks before letting it go.
+                  if (ext?.onTutorSwitch && !(await ext.onTutorSwitch(t.key))) return;
+                  upd(m => switchTutor(m, t.key));
+                })()}>
+                <span style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--cream);display:flex;align-items:flex-end;flex-shrink:0">
+                  <span style="width:100%;height:100%;margin-bottom:-2px;display:block"><TutorFace tutor={t.key} /></span>
+                </span>
+                {t.name}
+              </button>
+            ))}
+          </div>
         </div>
         <div class="kv"><span class="k">{S.settings.odileStyle}</span>
           <div class="pills">
@@ -395,6 +427,8 @@ export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast }: Props)
         </div>
       </div>
 
+      {ext && <ext.SettingsCard />}
+
       {/* The entrance is hidden from everyone else; the DATABASE decides whether the rows
           come back (docs/SCHEMA.sql). Hiding a button is not access control. */}
       {isAdmin(supaEmail()) && (
@@ -438,6 +472,178 @@ export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast }: Props)
       <div class="tiny" style="margin:14px 2px;line-height:1.6">
         {S.settings.footer}
       </div>
+    </div>
+  );
+}
+
+/** The grammar strand's controls: what the app is going to teach next, in what order, and
+ *  how much of a review sitting the exercises are allowed to take.
+ *
+ *  The order is the point. The app's own priority — worst gap at or below the learner's band
+ *  first — is a good default and a bad rule: a student with an exam in three weeks knows
+ *  better than the matrix does which five concepts matter. Anything moved up stays up, in
+ *  the order it was put in; everything else keeps falling back to the automatic ranking.
+ *
+ *  Reordering is arrows rather than dragging. A drag-and-drop list is the wrong bet on a
+ *  phone in a warm hand, and there is no such primitive anywhere else in this app to borrow. */
+function GrammarSettings({ mem, upd }: { mem: Memory; upd: (fn: (m: Memory) => void) => void }) {
+  const S = ui();
+  const g = grammarOf(mem);
+  const byId = compById(mem.profile.target);
+  // Eight is as far as a settings list is worth reading; the ranking behind it is still the
+  // whole map, which is what the arrows are disabled against.
+  const queueAll = grammarQueue(mem);
+  const queue = queueAll.slice(0, 8);
+  const learning = learningTopics(mem);
+  const mastered = Object.entries(g.topics)
+    .filter(([, t]) => t.masteredAt || t.manual)
+    .sort((a, b) => String(b[1].masteredAt ?? '').localeCompare(String(a[1].masteredAt ?? '')));
+  const cards = Math.max(1, mem.settings.sessionSize);
+  const share = mem.settings.grammarShare ?? GRAMMAR_SHARE;
+
+  /** Moves a concept one place within the queue.
+   *
+   *  The stored order is the queue AS SHOWN, cut off after the moved concept: everything
+   *  above it is now pinned, everything below goes on being ranked automatically. Storing
+   *  the whole list instead would freeze the tail too, and a gap that opens up next week
+   *  would never be able to climb past a concept the student merely scrolled past today. */
+  const move = (id: string, by: number) => upd(m => {
+    const ranked = grammarQueue(m).map(c => c.id);
+    const i = ranked.indexOf(id);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= ranked.length) return;
+    [ranked[i], ranked[j]] = [ranked[j], ranked[i]];
+    grammarState(m).order = ranked.slice(0, Math.max(i, j) + 1);
+  });
+
+  const setStatus = (id: string, what: 'done' | 'reopen' | 'skip' | 'unskip') => upd(m => {
+    const st = grammarState(m);
+    if (what === 'done') {
+      // An empty `courseAt` is what says "nobody ever taught this, the student simply says
+      // they know it". `manual` cannot carry that meaning, because it is also stamped on a
+      // concept that WAS taught and drilled and is being retired early — and reopening one
+      // of those must give the student their history back, not throw it away.
+      st.topics[id] = { ...(st.topics[id] ?? { courseAt: '', days: [] }), masteredAt: todayISO(), manual: 1 };
+      st.order = st.order.filter(x => x !== id);
+    } else if (what === 'reopen') {
+      const t = st.topics[id];
+      if (t && !t.courseAt) delete st.topics[id];        // never taught: back onto the queue
+      else if (t) {
+        // Taught before, and the student is saying it did not stick after all. Everything
+        // from the last teaching stops being evidence, exactly as a redo does — otherwise
+        // the next sitting re-masters it on the very tallies just contradicted.
+        delete t.masteredAt;
+        delete t.manual;
+        t.redoneAt = todayISO();
+      }
+      st.skipped = st.skipped.filter(x => x !== id);
+    } else if (what === 'skip') {
+      st.skipped = [...st.skipped.filter(x => x !== id), id];
+      st.order = st.order.filter(x => x !== id);
+    } else {
+      st.skipped = st.skipped.filter(x => x !== id);
+    }
+  });
+
+  return (
+    <div class="card">
+      <div style="font-family:var(--disp);font-weight:800;font-size:17px;margin-bottom:4px">{S.gram.title}</div>
+
+      <div class="kv"><span class="k">{S.gram.share}</span>
+        <div class="pills">
+          <button class={'pill ' + (share === 0 ? 'on' : '')} onClick={() => upd(m => (m.settings.grammarShare = 0))}>{S.gram.shareOff}</button>
+          {[15, 25, 40].map(n => (
+            <button key={n} class={'pill ' + (share === n ? 'on' : '')}
+              onClick={() => upd(m => (m.settings.grammarShare = n))}>{n} %</button>
+          ))}
+        </div>
+      </div>
+      <div class="tiny" style="margin:2px 0 10px">{S.gram.shareNote(drillCount({ grammarShare: share }, cards), cards)}</div>
+
+      {/* What is being worked on and what is queued behind it, in the order they will come. */}
+      <div class="kicker" style="margin-top:4px">{S.gram.queue}</div>
+      {queue.length === 0 && learning.length === 0
+        ? <div class="tiny" style="margin-top:6px">{S.gram.queueEmpty}</div>
+        : (
+          <div class="gset">
+            {/* Being taught right now: it holds its place until it is mastered, so it has
+                no arrows — there is nowhere for it to move to. */}
+            {learning.map(id => {
+              const item = byId[id];
+              if (!item) return null;
+              return (
+                <div key={id} class="gsetrow on">
+                  <span class="lvl">{item.band}</span>
+                  <span class="gsetlab" lang={mem.profile.target}>{item.label}</span>
+                  <div class="gsetacts">
+                    <button class="btn subtle" onClick={() => setStatus(id, 'done')}>{S.gram.markDone}</button>
+                  </div>
+                </div>
+              );
+            })}
+            {/* Queued behind it, in the order they will come. Indices here are the QUEUE's
+                own, not the list's, so the arrows are disabled exactly when they would do
+                nothing rather than one row out. */}
+            {queue.map((item, i) => (
+              <div key={item.id} class="gsetrow">
+                <span class="lvl">{item.band}</span>
+                <span class="gsetlab" lang={mem.profile.target}>{item.label}</span>
+                <div class="gsetacts">
+                  <button class="btn subtle" title={S.gram.up} aria-label={S.gram.up}
+                    disabled={i === 0} onClick={() => move(item.id, -1)}>↑</button>
+                  <button class="btn subtle" title={S.gram.down} aria-label={S.gram.down}
+                    disabled={i === queueAll.length - 1} onClick={() => move(item.id, 1)}>↓</button>
+                  <button class="btn subtle" onClick={() => setStatus(item.id, 'done')}>{S.gram.markDone}</button>
+                  <button class="btn subtle" onClick={() => setStatus(item.id, 'skip')}>{S.gram.skip}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+      {mastered.length > 0 && (
+        <div>
+          <div class="kicker" style="margin-top:14px">{S.gram.done}</div>
+          <div class="gset">
+            {mastered.map(([id, t]) => {
+              const item = byId[id];
+              if (!item) return null;
+              return (
+                <div key={id} class="gsetrow">
+                  <span class="lvl">{item.band}</span>
+                  <span class="gsetlab" lang={mem.profile.target}>
+                    {item.label}{t.manual ? ' · ' + S.gram.manual : ''}
+                  </span>
+                  <div class="gsetacts">
+                    <button class="btn subtle" onClick={() => setStatus(id, 'reopen')}>{S.gram.reopen}</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {g.skipped.length > 0 && (
+        <div>
+          <div class="kicker" style="margin-top:14px">{S.gram.skipped}</div>
+          <div class="gset">
+            {g.skipped.map(id => {
+              const item = byId[id];
+              if (!item) return null;
+              return (
+                <div key={id} class="gsetrow">
+                  <span class="lvl">{item.band}</span>
+                  <span class="gsetlab" lang={mem.profile.target}>{item.label}</span>
+                  <div class="gsetacts">
+                    <button class="btn subtle" onClick={() => setStatus(id, 'unskip')}>{S.gram.unskip}</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

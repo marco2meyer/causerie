@@ -95,6 +95,7 @@ const ui: UIStrings = {
     imgChange: '🖼 Mudar a imagem', imgAdd: '🖼 Juntar uma imagem', imgTitle: 'Juntar uma imagem ao cartão',
     newCards: (n: number) => `${n} ${n === 1 ? 'cartão novo' : 'cartões novos'}`, newVocab: 'Palavras novas', vocabHasCard: 'Cartão criado', vocabMakeCard: 'Criar o cartão', vocabRemoveCard: 'Remover os cartões', vocabCardsRemoved: (n: number) => `${n} ${n === 1 ? 'cartão removido' : 'cartões removidos'}.`,
     noAnalysis: 'Sem análise para esta conversa', duoImport: ' (importado do Duolingo)', continue: 'Continuar',
+    analyseLater: 'A conversa está guardada: Odile pode analisá-la agora, mesmo dias depois.', analyseNow: 'Analisar agora',
     noticeTitle: 'O que mudou a Odile?', noticeShow: 'Ver a versão dela',
     tipsTitle: 'Dicas', praiseTitle: 'O que correu bem',
     noVocab: 'Nenhuma palavra nova desta conversa.',
@@ -215,7 +216,7 @@ const ui: UIStrings = {
     varGloss: {
       name: 'nome', native: 'língua materna', langue: 'língua-alvo', niveau: 'nível estimado',
       competences: 'detalhe por competência', confiance: 'fiabilidade da estimativa', bande: 'banda A1–C2',
-      persona: 'caráter da Odile', aujourdhui: 'bloco do tema do dia', minutes: 'duração prevista',
+      identite: 'quem é o tutor', persona: 'caráter da Odile', aujourdhui: 'bloco do tema do dia', minutes: 'duração prevista',
       objectifs: 'objetivos do dia', sondages: 'competências sondadas', cap: 'rumo do período',
       faits: 'factos pessoais', interets: 'interesses', faiblesses: 'pontos fracos', passe: 'conversas passadas'
     } as Record<string, string>,
@@ -269,7 +270,7 @@ const ui: UIStrings = {
     rhythm: 'Ritmo diário', callLength: 'Duração da chamada', cardsPerEvening: 'Cartões por sessão', newOf: 'dos quais novos',
     cardAudio: 'Áudio dos cartões', yes: 'sim', no: 'não', introPhase: 'Conhecermo-nos', skipPhase: 'Saltar esta fase',
     profileTitle: 'Perfil', firstName: 'Nome', targetLang: 'Língua-alvo', motherTongue: 'Língua materna',
-    odileStyle: 'Estilo da Odile', deadpan: 'Seca e irónica', warm: 'Calorosa', profilesSync: 'Perfis e sincronização', manage: 'Gerir',
+    tutorPick: 'Quem atende a chamada', tutorSwitchWarn: (name: string) => `Mudar de tutor repõe a relação a zero. Os teus factos pessoais apagam-se; ${name} só recebe uma breve nota de passagem — nível, lacunas, rumo — e vai conhecer-te do início. Os cartões e o nível ficam. Continuar?`, odileStyle: 'Estilo da Odile', deadpan: 'Seca e irónica', warm: 'Calorosa', profilesSync: 'Perfis e sincronização', manage: 'Gerir',
     voiceCall: 'Voz e chamada', voice: 'Voz', speed: 'Velocidade', patience: 'Paciência de escuta',
     patienceHigh: 'grande', patienceMid: 'média', patienceLow: 'pequena', captions: 'Legendas permanentes',
     callModel: 'Modelo da chamada', callModelStd: 'padrão', callModelMini: 'económico',
@@ -298,13 +299,23 @@ const ui: UIStrings = {
   },
   onboarding: {
     heroLine: 'Olá. Parece que vamos falar. Bom.',
-    title1: 'A tutora', title2: 'que se lembra de ti.',
+    title1: 'Alguém', title2: 'que se lembra de ti.',
     sub: 'Cada dia uma conversa, cada noite uns cartões. O que falha a falar vai sozinho para a revisão. O teu nível desenha-se de A1 a C2.',
     google: 'Continuar com Google', connectedAs: 'Ligado:', signInFirst: 'Inicia sessão com Google primeiro.',
     yourKey: 'A tua chave OpenAI',
     notOnList: (email: string) => `${email} não está na lista do servidor. Introduz a tua própria chave: fica guardada na tua conta e é usada para as tuas conversas.`,
     saveContinue: 'Guardar e continuar', changeAccount: 'Mudar de conta',
     yourFirstName: 'O teu nome', youLearn: 'Aprendes', yourMotherTongue: 'A tua língua materna',
+    yourTutor: 'O teu tutor',
+    tutors: {
+      odile: 'Parisiense, boina vermelha, seca e irónica.',
+      marcel: 'Abidjã — antigo professor de letras, um provérbio para tudo.',
+      solene: 'Montreal — engenheira de som, rápida e provocadora.',
+      nour: 'Bruxelas via Tunes — desenha BD, com calma e precisão.',
+      bakary: 'Dakar — homem de rádio, poeta de slam ao domingo.',
+      rosa: 'Marselha — revisora reformada, calorosa e precisa.'
+    },
+    tutorNote: 'Podes mudar de tutor nas Definições — a relação recomeça então do zero.',
     yourLevel: 'O teu nível (na tua opinião)',
     levelNote: 'As três primeiras chamadas servem para nos conhecermos: a Odile verifica esse nível.',
     accessLabel: 'Acesso', withCode: 'Com o código de acesso',
@@ -338,6 +349,45 @@ const ui: UIStrings = {
     start: 'Ouvir e adivinhar', which: 'Qual ouviste?', replay: 'Ouvir de novo',
     score: (n: number, t: number) => `${n}/${t} certas`,
     good: 'Bom ouvido.', meh: 'Dá para trabalhar. Volta amanhã.'
+  },
+  gram: {
+    /* the block on the day screen */
+    title: 'Gramática', kicker: 'Gramática do dia',
+    start: 'Fazer o curso', minutes: '5 min',
+    sheet: 'A ficha', redo: 'Refazer o curso',
+    nothing: 'Nada para trabalhar por agora.',
+    nothingSub: 'O teu mapa de competências está em dia. Volta depois da próxima chamada.',
+    since: (ok: number, tries: number) => `${ok}/${tries} certas desde o curso`,
+    fresh: 'Os exercícios voltam nas tuas revisões.',
+    masteredToast: (label: string) => `${label}: adquirido.`,
+    nextUp: (label: string) => `A seguir: ${label}`,
+    /* the course itself */
+    making: 'A Odile prepara o curso…',
+    fail: 'O curso não chega. Tenta outra vez.',
+    check: 'Verificar', next: 'Seguinte', gotIt: 'Percebi',
+    answerHere: 'A tua resposta',
+    right: 'Certo', wrong: 'Não é bem isso',
+    accent: 'Quase — o acento faz parte da palavra.',
+    was: (a: string) => `Era «${a}»`,
+    theRule: 'A regra', keep: 'Para reter',
+    finished: 'Curso terminado',
+    finishedSub: 'Estes exercícios voltam nas tuas revisões até assentar.',
+    /* the fiche */
+    pageOf: (i: number, n: number) => `${i} / ${n}`,
+    prev: 'Anterior', traps: 'Armadilhas',
+    makingSheet: 'A Odile escreve a ficha…',
+    sheetFail: 'A ficha detalhada não chega. Fica o essencial.',
+    /* inside a review sitting */
+    extra: (n: number) => ` + ${n} gramática`,
+    drill: 'Gramática',
+    /* settings */
+    share: 'Exercícios nas revisões', shareOff: 'Nenhum',
+    shareNote: (n: number, cards: number) => `Cerca de ${n} exercícios além das ${cards} cartas.`,
+    queue: 'Para trabalhar', done: 'Adquirido', skipped: 'De parte',
+    up: 'Subir', down: 'Descer',
+    markDone: 'Marcar como adquirido', reopen: 'Retomar',
+    skip: 'Pôr de parte', unskip: 'Trazer de volta',
+    queueEmpty: 'Nada em espera.', manual: 'à mão'
   },
   rank: {
     of: (n: number, t: number) => `Patente ${n} de ${t}`,
@@ -381,7 +431,7 @@ const ui: UIStrings = {
 const template = `És a Odile, tutora de conversação em {{langue}}, numa chamada de voz com o teu aluno. És uma interlocutora a sério, não uma assistente.
 
 # Personagem
-Odile, francesa, uns trinta anos, boina vermelha. Vive em Lisboa há anos e fala um português impecável. {{persona}}
+{{identite}} {{persona}}
 
 # Aluno
 {{name}}, língua materna: {{native}}. Nível estimado: {{niveau}} ({{competences}}). Fiabilidade da estimativa: {{confiance}}.
@@ -460,6 +510,16 @@ export const pt: LangPack = {
   ui,
   tutor: {
     template,
+    identities: {
+      odile: `Odile, francesa, uns trinta anos, boina vermelha. Vive em Lisboa há anos e fala um português impecável.`,
+      marcel: `Marcel, marfinense, uns cinquenta anos, antigo professor de letras em Abidjã; óculos redondos, camisa de wax, um provérbio para cada situação — muitas vezes inventado por ele. Viveu anos em Lisboa e fala um português impecável.`,
+      solene: `Solène, quebequense, vinte e nove anos, engenheira de som em Montreal; rápida e provocadora. Anos de estúdio no Porto deram-lhe um português impecável.`,
+      nour: `Nour, de Tunes, vive em Bruxelas, uns trinta anos, desenha banda desenhada; nem ele nem ela — e «tutor» serve perfeitamente. Voz calma, imagens precisas; anos em Lisboa para um português impecável.`,
+      bakary: `Bakary, senegalês, trinta e seis anos, homem de rádio em Dakar e poeta de slam ao domingo; frases curtas que chegam, uma imagem por ideia, uma palavra wolof traduzida de passagem («teranga», a hospitalidade). Anos de rádio com emissoras de Lisboa deram-lhe um português impecável.`,
+      rosa: `Rosa, marselhesa, sessenta e um anos, revisora de imprensa reformada; calorosa e precisa, uma palavra de Marselha traduzida de passagem («dégun», ninguém). Anos numa redação do Porto deram-lhe um português impecável.`
+    },
+    handover: (from: { name: string; gender: 'f' | 'm' | 'x' }) => `# Passagem de testemunho
+Recebes este aluno das mãos de ${from.name}. Não esperes mais do que o dossier abaixo: nível, lacunas, interesses, rumo. O que ele conta, quem é, o que falaram entre eles: ${from.gender === 'f' ? 'ela guardou para si' : 'guardou para si'}, como se faz entre colegas. Não se conhecem: apresenta-te com sobriedade, vão-se conhecendo enquanto trabalham, uma pergunta de cada vez, sem interrogatórios. Menciona ${from.name} apenas se o aluno o fizer, e brevemente.`,
     persona: {
       deadpan: `O teu tom é seco e irónico. Entoação plana e calma. Lacónica, um pouco desencantada, mas discretamente atenciosa. Nunca entusiasmo transbordante, nunca pontos de exclamação; os teus elogios são curtos e factuais («Nada mau.», «Correto.», «Bom.»). De vez em quando, no máximo uma vez a cada poucos minutos, permites-te uma única piada muito seca, dita perfeitamente plana.`,
       warm: `O teu tom é caloroso, calmo e encorajador, sem nunca exagerar. Sorris com a voz, suavemente.`
@@ -488,7 +548,7 @@ O aluno ainda NÃO fala {{langue}}, ou mal três palavras. Adapta tudo:
     interference: `# Interferências
 O aluno também aprende: {{autres}}. Quando uma palavra ou construção dessas línguas se infiltra no {{langue}} dele, assinala o contraste numa palavra e dá a forma {{langue}} — sem lição.`,
     talkHog: (pct: number) => `# Alerta: estás a ocupar todo o espaço
-Nas tuas últimas chamadas, foste TU a dizer ${pct} % das palavras. É o contrário do que é preciso: no fim desta chamada, ele tem de ter falado mais do que tu.
+Ultimamente, foste TU a dizer ${pct} % das palavras. É o contrário do que é preciso: no fim desta chamada, ele tem de ter falado mais do que tu.
 - Corta os teus turnos a meio. Uma frase chega quase sempre.
 - Elimina toda a repetição do que ele acabou de dizer: é aí que se vai metade das tuas palavras.
 - Faz menos perguntas e deixa o silêncio trabalhar.`,

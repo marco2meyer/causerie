@@ -666,3 +666,115 @@ textarea.json,.json{max-width:100%}
   color:var(--ink3);opacity:.4;pointer-events:none;transition:opacity .12s,color .12s}
 .rev-card.dragging .rev-backcue{opacity:.85}
 .rev-backcue.armed{color:var(--tomato);opacity:1}
+
+/* ---- grammar: the four drawings a lesson may ask for (components/Viz.tsx) ---- */
+.viz{margin:0;width:100%;max-width:440px;background:var(--paper);color:var(--ink);border:var(--bw2) solid var(--edge);border-radius:var(--r-sm);padding:13px 14px 11px}
+.viz figcaption{margin-top:9px;font-size:12px;font-weight:600;color:var(--ink3);line-height:1.45;text-align:left}
+/* timeline: one lane per span, the axis under the lot */
+.viz-time{overflow:hidden}
+.viz-axis{position:relative;width:100%}
+.viz-span{position:absolute;height:24px;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:700;white-space:nowrap}
+.viz-span.t-a{background:var(--tomato);color:var(--cream)}
+.viz-span.t-b{background:var(--blue);color:var(--cream)}
+.viz-span.pt{border-radius:50%;width:14px!important;height:14px;padding:0;margin-top:5px}
+.viz-span.pt span{position:absolute;left:19px;color:var(--ink);font-weight:700}
+.viz-line{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--line2)}
+/* table: a paradigm, with the cells that matter picked out */
+.viz-tablewrap{overflow-x:auto}
+.viz-table{border-collapse:collapse;font-size:13.5px;width:100%}
+.viz-table th,.viz-table td{padding:6px 9px;text-align:left;border-bottom:1px solid var(--line)}
+.viz-table thead th{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.viz-table th[scope=row]{font-weight:700;color:var(--ink2);white-space:nowrap}
+.viz-table td{font-weight:650}
+.viz-table td.hi{background:var(--jaune);border-radius:6px;color:var(--ink)}
+/* chunks: word order as slots */
+.viz-chunks{display:flex;flex-wrap:wrap;align-items:flex-start;gap:7px}
+.viz-slot{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.viz-box{padding:8px 12px;border-radius:9px;font-weight:800;font-size:15px;font-family:var(--disp);white-space:nowrap}
+.viz-slotlab{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);text-align:center}
+/* split: a two-way contrast */
+.viz-split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.viz-side{border-radius:10px;padding:9px 11px;background:var(--sand)}
+.viz-side.s-a{box-shadow:inset 3px 0 0 var(--tomato)}
+.viz-side.s-b{box-shadow:inset 3px 0 0 var(--blue)}
+.viz-sidet{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px}
+.viz-side ul{margin:0;padding-left:15px}
+.viz-side li{font-size:13.5px;font-weight:600;line-height:1.5}
+
+/* ---- grammar: the lesson and the fiche (views/Grammar.tsx) ---- */
+/* A lesson is as long as its evidence, and its evidence can be longer than a phone. The
+   stage is pinned to the viewport so the card scrolls INSIDE its own frame and the one
+   button that moves the lesson on never leaves the screen. */
+.gr-stage{height:100dvh;min-height:0}
+.gr-stage .rev-actions{flex-shrink:0}
+.gr-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px}
+/* The lesson card is cream on the app's own ground rather than the deck's yellow: this is
+   reading and working out, not retrieval, and it wants the calmer surface. */
+.gr-card{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:13px;background:var(--paper);color:var(--ink);
+  border:var(--bw) solid var(--edge);border-radius:24px;padding:20px 18px;overflow-y:auto}
+.gr-card.rule{background:var(--jaune);color:var(--ink)}
+.gr-card.rule .rev-type{color:var(--jaune-ink)}
+.gr-prompt{font-family:var(--disp);font-weight:800;font-size:clamp(19px,4.8vw,24px);line-height:1.22;letter-spacing:-.01em;text-wrap:pretty}
+/* the evidence a discovery step is worked out from */
+.gr-ex{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.gr-ex li{padding:9px 11px;background:var(--sand);border-radius:10px;line-height:1.4}
+.gr-card.rule .gr-ex li{background:rgba(255,249,238,.55)}
+.gr-ex li b{display:block;font-family:var(--disp);font-weight:800;font-size:16.5px}
+.gr-ex li span{display:block;font-size:12.5px;color:var(--ink2);font-weight:600;margin-top:2px}
+.gr-rule{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.gr-rule li{font-size:15px;font-weight:650;line-height:1.45}
+/* multiple choice */
+.gr-opts{display:flex;flex-direction:column;gap:8px}
+.gr-opt{text-align:left;padding:13px 15px;border-radius:var(--r-sm);background:var(--paper);color:var(--ink);
+  border:var(--bw2) solid var(--line2);font-weight:650;font-size:15px;line-height:1.35}
+.gr-opt.on{border-color:var(--edge);background:var(--sand)}
+.gr-opt.right{background:var(--jaune);border-color:var(--edge);color:var(--ink)}
+.gr-opt.wrong{background:var(--tomato);border-color:var(--tomato);color:var(--cream)}
+.gr-opt.dim{opacity:.45}
+.gr-opt:disabled{cursor:default}
+/* typed gap */
+.gr-gap{display:flex;flex-direction:column;gap:10px}
+.gr-sentence{font-family:var(--disp);font-weight:800;font-size:19px;line-height:1.6;text-wrap:pretty}
+.gr-slot{display:inline-block;min-width:64px;border-bottom:3px solid var(--line2);margin:0 3px;text-align:center}
+.gr-slot.filled{border-bottom-color:transparent;border-radius:7px;padding:1px 8px}
+.gr-slot.filled.ok{background:var(--jaune)}
+.gr-slot.filled.near{background:var(--jaune-soft)}
+.gr-slot.filled.no{background:var(--tomato);color:var(--cream)}
+.gr-input{width:100%;padding:12px 14px;font-size:17px;font-weight:650;border-radius:var(--r-sm);
+  background:var(--paper);color:var(--ink);border:var(--bw2) solid var(--edge)}
+.gr-input:disabled{opacity:.6}
+/* the verdict, and the reason under it */
+.gr-verdict{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.45}
+.gr-verdict b{font-family:var(--disp);font-weight:800;font-size:15.5px}
+.gr-verdict.ok{background:var(--jaune-soft);color:var(--jaune-ink)}
+.gr-verdict.near{background:var(--jaune-soft);color:var(--jaune-ink)}
+.gr-verdict.no{background:var(--rose-soft);color:var(--tomato-deep)}
+.gr-explain{font-size:14.5px;line-height:1.55;color:var(--ink2);text-wrap:pretty}
+.gr-card.rule .gr-explain{color:var(--jaune-ink)}
+/* the fiche */
+.gr-sheet{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:12px;background:var(--paper);color:var(--ink);
+  border:var(--bw) solid var(--edge);border-radius:24px;padding:20px 18px;overflow-y:auto}
+.gr-page{display:flex;flex-direction:column;gap:12px}
+.gr-pagetitle{font-family:var(--disp);font-weight:800;font-size:17px;line-height:1.25}
+.gr-traps{padding:11px 13px;background:var(--rose-soft);border-radius:10px}
+.gr-traps ul{margin:5px 0 0;padding-left:17px;display:flex;flex-direction:column;gap:5px}
+.gr-traps li{font-size:13.5px;font-weight:600;line-height:1.45;color:var(--tomato-deep)}
+
+/* ---- grammar: one exercise inside a review sitting (components/DrillCard.tsx) ---- */
+/* Yellow in this app means a card that fell out of a conversation. An exercise is not one —
+   nothing about it is scheduled, and answering it reschedules nothing — so it takes the
+   cream surface with a blue edge instead, and reads left-aligned like a question rather
+   than centred like a card. */
+.rev-card.drill{--card:var(--paper);--card-ink:var(--blue-deep);
+  border-color:var(--blue);align-items:stretch;justify-content:flex-start;text-align:left;gap:12px;overflow-y:auto}
+.rev-card.drill .gr-sentence{font-size:clamp(18px,4.6vw,22px)}
+
+/* ---- grammar: the queue editor in the settings (views/Settings.tsx) ---- */
+.gset{display:flex;flex-direction:column;margin-top:6px}
+.gsetrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.gsetrow:last-child{border-bottom:none}
+/* the concept currently being taught and drilled */
+.gsetrow.on{border-left:4px solid var(--tomato);padding-left:9px}
+.gsetlab{flex:1 1 180px;min-width:0;font-size:14.5px;font-weight:650;line-height:1.35;overflow-wrap:anywhere}
+.gsetacts{display:flex;gap:6px;margin-left:auto;flex-shrink:0;flex-wrap:wrap}
+.gsetacts .btn{padding:6px 11px;font-size:11.5px}

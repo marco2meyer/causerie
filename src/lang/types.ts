@@ -37,6 +37,14 @@ export interface Topic {
 export interface TutorPack {
   /** Briefing template, entirely in the target language, with {{placeholders}}. */
   template: string;
+  /** One identity line per tutor key (lib/tutors.ts), in the target language; fills the
+   *  template's {{identite}}. Odile's is the line the template always carried. */
+  identities: Record<string, string>;
+  /** "# Passation" block for the first calls after a tutor switch: who handed the
+   *  student over, that only the learning file came with them, and the instruction to
+   *  get acquainted from scratch. Must be read off the RAW pack (lang.PACKS), never the
+   *  tutor-rewritten one — the rewrite would rename the old tutor into the new one. */
+  handover: (from: { name: string; gender: 'f' | 'm' | 'x' }) => string;
   persona: { deadpan: string; warm: string };
   /** "# Today" block for the getting-to-know-you calls; n = 1-based number of this intro call (1-3). */
   todayIntro: (n: number) => string;

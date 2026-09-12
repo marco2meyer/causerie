@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { fetchEvents, summarise, totals, type UserStat } from '../lib/events';
 import { fmtDate } from '../lib/utils';
 import { ui } from '../lang';
+import type { CompanionModule } from '../lib/companionSeam';
 
 /** Who is using this, and how much.
  *
@@ -10,7 +11,7 @@ import { ui } from '../lang';
  *  reaches an empty screen rather than someone else's data. Deliberately plain. It is an
  *  operator's screen, not part of the product, and dressing it up would be the tell that
  *  someone thought it was. */
-export function Admin({ onBack }: { onBack: () => void }) {
+export function Admin({ onBack, ext }: { onBack: () => void; ext?: CompanionModule | null }) {
   const S = ui();
   const [stats, setStats] = useState<UserStat[] | null>(null);
   const [err, setErr] = useState(false);
@@ -79,6 +80,7 @@ export function Admin({ onBack }: { onBack: () => void }) {
       )}
 
       {stats && stats.length === 0 && <div class="card muted">{S.admin.empty}</div>}
+      {ext && <ext.AdminCard />}
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { Card, Grade, Memory } from '../types';
+import type { Card, Grade, GrammarDrill, Memory } from '../types';
+import { withSittingBonus, type CompanionModule } from '../lib/companionSeam';
 import { reviewSessionsOn, touchStreak, reviewXp } from '../lib/gamify';
+import { banksFor } from '../lib/course';
+import {
+  drillCount, drillId, drillIndex, interleave, isDrillId, learningTopics, pickDrills, recordDrill, settleMastery
+} from '../lib/grammar';
+import { compById } from '../lib/competencies';
+import { DrillCard } from '../components/DrillCard';
 import { LANGS } from '../lib/langs';
 import { startRec, type Rec } from '../lib/recorder';
 import { clearRevState, loadRevState, saveRevState } from '../lib/revstate';
@@ -27,6 +34,8 @@ interface Props {
   toast?: (msg: string, err?: boolean) => void;
   /** Morning primer: cap the queue (e.g. 3 cards right before the call). */
   cap?: number;
+  /** Optional extension module: it may widen the sitting while it feeds the deck. */
+  ext?: CompanionModule | null;
 }
 
 /** Everything one move changes, kept so the move can be taken back. */
@@ -37,30 +46,67 @@ interface Step {
   revealed: boolean;
   graded: string[];
   started: number;
+  /** The grammar answers banked so far, so stepping back off an exercise un-banks it. */
+  drillLog: { topic: string; right: boolean }[];
   /** The card as it stood before it was graded. Absent when the step was only a reveal. */
   card?: Card;
 }
 
+/** The cards this sitting holds, before any grammar is threaded through them. Pulled out
+ *  because the queue and the number of exercises are both sized against it and the two have
+ *  to agree — a share of the sitting computed from a different sitting is not a share.
+ *  `beyondPlan` deliberately reads the UNWIDENED settings, as it did before: a sitting the
+ *  extension made larger is still one of the day's planned sittings. */
+function buildInitialCards(mem: Memory, ext?: CompanionModule | null): Card[] {
+  const sittings = reviewSessionsOn(mem, todayISO());
+  const planned = withSittingBonus(mem, ext);
+  const plan = sittingPlan(planned, sittings, todayISO());
+  return buildSession(mem.deck, planned.settings.sessionSize, plan.newCap,
+    todayISO(), beyondPlan(mem.settings, sittings), plan.dueCap);
+}
+
 /** One evening review session, Fluent-Forever style: ~15 cards, four grades, audio on reveal. */
-export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
+export function ReviewSession({ mem, setMem, onExit, toast, cap, ext }: Props) {
   const S = ui();
   const langName = (LANGS[mem.profile.target] ?? LANGS.fr).name;
   const TYPE_LABEL = { cloze: S.rev.typeCloze, fr2de: S.rev.typeToNative, de2fr: S.rev.typeToTarget(langName) } as const;
   // A session interrupted by a reload resumes where it was (same day, cards intact).
   const saved = useMemo(() => loadRevState(new Set(mem.deck.cards.map(c => c.id))), []);
+  /** This sitting's grammar exercises, by queue id. Built once, alongside the queue, and
+   *  never fetched: lib/course wrote the bank when the lesson was taken, so an evening's
+   *  exercises are already on the device before the first card is turned over. */
+  const [drills] = useState<GrammarDrill[]>(() => {
+    if (saved) return saved.drills ?? [];
+    // Never on the pre-call warm-up: three cards before a conversation is a retrieval
+    // primer, and interrupting it with grammar is not what it is for.
+    if (cap) return [];
+    const banks = banksFor(learningTopics(mem));
+    const cards = buildInitialCards(mem, ext);
+    return pickDrills(mem, drillCount(mem.settings, cards.length), banks, todayISO(),
+      reviewSessionsOn(mem, todayISO()));
+  });
   const initialQueue = useMemo(
     // Sittings already finished today, counted BEFORE this one starts: past the day's plan
     // the new-card throttle comes off, so a third sitting is a real sitting.
     () => (saved?.queue ?? (() => {
-      const sittings = reviewSessionsOn(mem, todayISO());
-      const plan = sittingPlan(mem, sittings, todayISO());
-      return buildSession(mem.deck, mem.settings.sessionSize, plan.newCap,
-        todayISO(), beyondPlan(mem.settings, sittings), plan.dueCap).map(c => c.id);
+      const cards = buildInitialCards(mem, ext).map(c => c.id);
+      // The exercises are ADDED to the cards rather than taken from them: a sitting of
+      // sixteen becomes twenty, and the deck never loses a review to the grammar strand.
+      return interleave(cards, drills.map((_, i) => drillId(i)));
     })()).slice(0, cap ?? Infinity),
     []
   );
   const initialLen = useRef(saved?.initialLen ?? initialQueue.length);
   const gradedIds = useRef(new Set<string>(saved?.graded ?? []));
+  /** XP this sitting actually awarded. Held rather than recomputed in the view: the summary
+   *  line used to inline `done + 5`, which was `reviewXp(done)` written out by hand, and the
+   *  moment exercises began earning a point each the screen started quietly under-reporting
+   *  the sitting by exactly the number of them. */
+  const awarded = useRef(0);
+  /** What the grammar exercises showed, banked until the sitting ends. They are written to
+   *  the concepts in one go at the end rather than one at a time: a tally is evidence about
+   *  a sitting, and half a sitting the student walked away from is not. */
+  const drillLog = useRef<{ topic: string; right: boolean }[]>(saved?.drillLog ?? []);
   /** Cards this sitting saw for the first time, for the deck's throughput (lib/pace). */
   const started = useRef(0);
   /** One undoable step per entry, pushed BEFORE the thing it undoes.
@@ -113,7 +159,11 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
   useEffect(() => () => { ansRec.current?.cancel(); }, []);
 
   const total = initialLen.current + stats.again; // "again" cards come around twice or more
-  const card = queue.length ? mem.deck.cards.find(c => c.id === queue[0]) : undefined;
+  // The head of the queue is either a card or one of this sitting's grammar exercises. The
+  // id says which; nothing else in the sitting has to know.
+  const headId = queue.length ? queue[0] : undefined;
+  const drill = headId && isDrillId(headId) ? drills[drillIndex(headId)] : undefined;
+  const card = headId && !drill ? mem.deck.cards.find(c => c.id === headId) : undefined;
 
   // The clip is fetched when the card APPEARS (plus the next one), so the reveal plays
   // instantly instead of arriving over the next card.
@@ -129,6 +179,14 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
     }
   }, [queue, audioOn]);
 
+  // A queue id that is neither one of this sitting's exercises nor a card still in the deck
+  // cannot be shown. Stepping over it keeps the sitting alive; left at the head of the queue
+  // it would render nothing, for ever, and the sitting would simply appear to have died.
+  useEffect(() => {
+    if (!headId || drill || card) return;
+    setQueue(q => q.slice(1));
+  }, [headId]);
+
   useEffect(() => {
     if (revealed && card?.audioText && audioOn) {
       speakP.current = speak(card.audioText, s => { if (s === 'error') toast?.(S.common.audioFail, true); });
@@ -138,7 +196,8 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
   // Keyboard: Space/Enter flips, 1-4 grade (desktop reviews without a mouse).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (personalizing || finished || (e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
+      if (personalizing || finished || drill) return;
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
       if (!revealed && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); reveal(); return; }
       // Not a button on the screen, but a keyboard has room for what a thumb has to swipe for.
       if (e.key === 'Backspace' || e.key === 'ArrowLeft') { e.preventDefault(); goBack(); return; }
@@ -152,11 +211,28 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
   });
   useEffect(() => () => stopSpeaking(), []);
 
+  /** Writes the sitting's grammar answers to the concepts they belong to, promotes any that
+   *  now clear the bar, and says so. Mutates `m`; returns the labels just mastered. */
+  const settleGrammar = (m: Memory): string[] => {
+    for (const a of drillLog.current) recordDrill(m, a.topic, a.right, todayISO());
+    // Settled even when the sitting carried no exercises. A student who has turned the
+    // exercises off still finishes concepts — on the evidence of the calls, or simply
+    // because the app has taught what it can — and gating this on an answered exercise is
+    // what would leave that student staring at the same concept for ever.
+    const byId = compById(m.profile.target);
+    return settleMastery(m, todayISO()).map(id => byId[id]?.label).filter(Boolean);
+  };
+
   const finish = (finalStats: typeof stats, m: Memory) => {
     clearRevState();
     const doneCount = Object.values(finalStats).reduce((a, b) => a + b, 0);
-    if (doneCount > 0) {
-      const xp = reviewXp(doneCount);
+    const drillsDone = drillLog.current.length;
+    // A sitting counts as done if ANYTHING in it was done. Grammar exercises ride on top of
+    // the cards, so this is nearly always the card count; it is not, in the one case where a
+    // reload dropped the cards out of a queue and left the exercises standing.
+    if (doneCount > 0 || drillsDone > 0) {
+      const xp = reviewXp(doneCount) + drillsDone;
+      const mastered = settleGrammar(m);
       m.deck.log.push({
         date: todayISO(), total: doneCount,
         again: finalStats.again, hard: finalStats.hard, good: finalStats.good, easy: finalStats.easy,
@@ -167,9 +243,13 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
       if (m.deck.log.length > 120) m.deck.log = m.deck.log.slice(-120);
       logEvent('review', Math.round((Date.now() - t0.current) / 1000), { cards: doneCount, warmup: !!cap });
       m.xp += xp;
+      awarded.current = xp;
       touchStreak(m, todayISO());
       saveMem(m);
       setMem(m);
+      // The one thing worth interrupting the end of a sitting for: a concept has gone from
+      // being worked on to being finished, and the next one is now on the day screen.
+      if (mastered.length) toast?.(S.gram.masteredToast(mastered[0]));
     }
     setFinished(true);
   };
@@ -181,7 +261,7 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
 
   const snapshot = (over: Partial<Step> = {}): Step => ({
     queue, seen, stats, revealed, started: started.current,
-    graded: [...gradedIds.current], ...over
+    graded: [...gradedIds.current], drillLog: drillLog.current, ...over
   });
 
   /** Turning the card over is a move like any other, so it goes on the stack too: the first
@@ -214,10 +294,12 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
     setRevealed(step.revealed);
     started.current = step.started;
     gradedIds.current = new Set(step.graded);
+    drillLog.current = step.drillLog ?? [];
     setAnswerUrl(url => { if (url) URL.revokeObjectURL(url); return null; });
     saveRevState({
       queue: step.queue, seen: step.seen, stats: step.stats, initialLen: initialLen.current,
-      graded: step.graded, elapsed: Math.round((Date.now() - t0.current) / 1000), date: todayISO()
+      graded: step.graded, elapsed: Math.round((Date.now() - t0.current) / 1000), date: todayISO(),
+      drills, drillLog: drillLog.current
     });
   };
 
@@ -240,6 +322,25 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
     backRef.current = 0;
     setBackX(0);
     if (armed) { backSwiped.current = true; goBack(); }
+  };
+
+  /** A grammar exercise answered. It is not graded and not scheduled: the queue simply moves
+   *  on, and the answer goes into the bank the sitting settles at the end. */
+  const onDrill = (right: boolean) => {
+    if (!drill) return;
+    history.current.push(snapshot());
+    drillLog.current = [...drillLog.current, { topic: drill.topic, right }];
+    const q = queue.slice(1);
+    const nextSeen = seen + 1;
+    setSeen(nextSeen);
+    setQueue(q);
+    if (q.length) {
+      saveRevState({
+        queue: q, seen: nextSeen, stats, initialLen: initialLen.current,
+        graded: [...gradedIds.current], elapsed: Math.round((Date.now() - t0.current) / 1000),
+        date: todayISO(), drills, drillLog: drillLog.current
+      });
+    } else finish(stats, deepClone(memRef.current));
   };
 
   const onGrade = async (g: Grade) => {
@@ -269,7 +370,8 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
     if (q.length) {
       saveRevState({
         queue: q, seen: nextSeen, stats: newStats, initialLen: initialLen.current,
-        graded: [...gradedIds.current], elapsed: Math.round((Date.now() - t0.current) / 1000), date: todayISO()
+        graded: [...gradedIds.current], elapsed: Math.round((Date.now() - t0.current) / 1000), date: todayISO(),
+        drills, drillLog: drillLog.current
       });
     }
     // Let the pronunciation finish before the next card appears (usually already done).
@@ -298,7 +400,7 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
           <h2 style="font-size:32px;line-height:1.08;margin-top:8px">{done ? S.rev.doneCards(uniq) : S.rev.nothing}</h2>
           {done > 0 && (
             <div style="margin-top:14px;font-size:14.5px;line-height:1.5;color:var(--ink2);text-wrap:pretty">
-              {S.rev.sessionLine(stats.good + stats.easy, stats.hard, stats.again, done + 5)}
+              {S.rev.sessionLine(stats.good + stats.easy, stats.hard, stats.again, awarded.current)}
             </div>
           )}
         </div>
@@ -309,8 +411,33 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
     );
   }
 
-  if (!card) return null;
   const progress = total ? Math.min(1, seen / Math.max(1, initialLen.current)) : 0;
+
+  /** The sitting's header, shared by cards and grammar exercises alike. */
+  const top = (
+    <div class="rev-top">
+      <button class="btn subtle" style="padding:7px 12px;font-size:12.5px" onClick={() => finish(stats, deepClone(memRef.current))}>{S.rev.finish}</button>
+      <div class="rev-bar"><i style={{ width: progress * 100 + '%' }}></i></div>
+      <button class={'speakbtn sm' + (audioOn ? '' : ' failed')} title={S.settings.cardAudio} aria-label={S.settings.cardAudio} aria-pressed={audioOn}
+        onClick={() => { if (audioOn) stopSpeaking(); setAudioOn(!audioOn); }}>
+        {audioOn ? <I.speaker /> : <I.speakeroff />}
+      </button>
+      <span class="tiny" style="width:44px;text-align:right">{seen}/{initialLen.current}</span>
+    </div>
+  );
+
+  // A grammar exercise, threaded in among the cards. Keyed by its queue position so the
+  // component remounts between exercises rather than carrying the last answer forward.
+  if (drill) {
+    return (
+      <div class="rev-stage fadein">
+        {top}
+        <DrillCard key={queue[0]} drill={drill} lang={mem.profile.target} onDone={onDrill} />
+      </div>
+    );
+  }
+
+  if (!card) return null;   // stepped over by the effect above
   // Nothing in this deck is pre-made: every card names the call it fell out of, and says
   // in one line why it exists. That provenance IS the mnemonic in La Troupe.
   const src = card.sourceSessionId ? mem.sessions.find(x => x.id === card.sourceSessionId) : undefined;
@@ -324,15 +451,7 @@ export function ReviewSession({ mem, setMem, onExit, toast, cap }: Props) {
 
   return (
     <div class="rev-stage fadein">
-      <div class="rev-top">
-        <button class="btn subtle" style="padding:7px 12px;font-size:12.5px" onClick={() => finish(stats, deepClone(memRef.current))}>{S.rev.finish}</button>
-        <div class="rev-bar"><i style={{ width: progress * 100 + '%' }}></i></div>
-        <button class={'speakbtn sm' + (audioOn ? '' : ' failed')} title={S.settings.cardAudio} aria-label={S.settings.cardAudio} aria-pressed={audioOn}
-          onClick={() => { if (audioOn) stopSpeaking(); setAudioOn(!audioOn); }}>
-          {audioOn ? <I.speaker /> : <I.speakeroff />}
-        </button>
-        <span class="tiny" style="width:44px;text-align:right">{seen}/{initialLen.current}</span>
-      </div>
+      {top}
 
       {/* Back is a gesture, not a control: a drag to the right undoes the last move — the
           answer goes back to its question, or the previous card comes back with its grade

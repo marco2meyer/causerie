@@ -27,3 +27,7 @@ ds-bundle/
 
 # Netlify CLI edge-bundler artifact, written by `netlify deploy --build`
 deno.lock
+
+# Rehearsal transcripts (scripts/rehearse.mjs): runs of a scripted student against the
+# voice model, kept for comparison, never part of the app.
+.rehearsals/

@@ -12,6 +12,9 @@ import { peekRevState } from '../lib/revstate';
 import { daysSkipped } from '../lib/month';
 import { beyondPlan, sessionsPerDay, sittingPlan } from '../lib/budget';
 import { buildSession } from '../lib/srs';
+import { drillCount, drillTally, grammarFocus, learningTopics } from '../lib/grammar';
+import { banksFor, cachedCourse, makeCourse } from '../lib/course';
+import { compById } from '../lib/competencies';
 import { sheetsForCall, type CheatSheet } from '../lib/sheets';
 import { goalCount, pickWordGoals } from '../lib/wordgoal';
 import { introTopics, suggestTopics, type TopicSuggestion } from '../lib/topics';
@@ -23,6 +26,7 @@ import { StoryPlayer } from '../components/StoryPlayer';
 import { I } from '../components/icons';
 import { SheetView } from '../components/SheetView';
 import { ui } from '../lang';
+import { withSittingBonus, type CompanionModule } from '../lib/companionSeam';
 
 interface Props {
   mem: Memory;
@@ -33,7 +37,8 @@ interface Props {
   openCheckin: (p: 'week' | 'month' | 'quarter') => void;
   toast: (msg: string, err?: boolean) => void;
   /** Starts a 3-card warm-up review (retrieval right before the call). */
-  warmup: () => void;
+  /** Optional extension module, when this build carries one. */
+  ext?: CompanionModule | null;
 }
 
 interface Chosen { t: string; fr?: string; lv: string; tags?: string[] }
@@ -45,7 +50,7 @@ function pick(s: TopicSuggestion | undefined, S: ReturnType<typeof ui>, lv: stri
   return s;
 }
 
-export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast, warmup }: Props) {
+export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast, ext }: Props) {
   const S = ui();
   const INTRO = introTopics(mem.profile.target);
   const d = todayISO();
@@ -67,9 +72,6 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
     return () => { live = false; };
   }, [tkey]);
   const suggestions = gen?.length ? gen : fallback;
-  const [si, setSi] = useState(0);
-  const [custom, setCustom] = useState('');
-  const [showCustom, setShowCustom] = useState(false);
   const targets = useMemo(() => focusTargets(mem, 3), [mem]);
   const sheets: CheatSheet[] = useMemo(() => (inIntroPhase(mem) ? [] : sheetsForCall(mem, focusTargets(mem, 3))), [mem]);
   const [showSheets, setShowSheets] = useState(false);
@@ -98,8 +100,10 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
     // the lower one swallowing taps meant for the player.
     if (s) { setMoreOpen(false); setPlayerOpen(true); }
   };
-  const plan = sittingPlan(mem, revToday, todayISO());
-  const queue = buildSession(mem.deck, mem.settings.sessionSize, plan.newCap,
+  // The sitting the extension asks for, when there is one: a few cards wider while it feeds the deck.
+  const planned = withSittingBonus(mem, ext);
+  const plan = sittingPlan(planned, revToday, todayISO());
+  const queue = buildSession(mem.deck, planned.settings.sessionSize, plan.newCap,
     todayISO(), beyondPlan(mem.settings, revToday), plan.dueCap);
   const queueLen = queue.length;
   // The card on top of the pile, shown on the day screen with the call it came
@@ -108,6 +112,41 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
   const peekDate = peek?.sourceSessionId
     ? mem.sessions.find(x => x.id === peek.sourceSessionId)?.date
     : undefined;
+  // The grammar strand: one concept at a time, taken from the competency map. French only
+  // for now — the courses and their exercises are written against the French map, and the
+  // other packs' cheat sheets do not share their competency ids (see lib/sheets).
+  const grammarOn = mem.profile.target === 'fr' && !intro;
+  const gram = useMemo(() => (grammarOn ? grammarFocus(mem) : null), [mem, grammarOn]);
+  // What tonight's sitting will carry on top of its cards, so the review block can say so
+  // rather than surprising the student with four extra screens. Counted from the BANKS, not
+  // from the concepts: a concept whose exercises are not on this device yet contributes
+  // nothing to the sitting, and promising four here and showing none there is worse than
+  // saying nothing at all.
+  const gramDrills = (() => {
+    if (!grammarOn || queueLen === 0) return 0;
+    const banks = banksFor(learningTopics(mem));
+    const stock = Object.values(banks).reduce((n, b) => n + b.length, 0);
+    return Math.min(stock, drillCount(mem.settings, queueLen));
+  })();
+  // Which concepts are being drilled syncs; the exercises themselves are cached per device.
+  // So a lesson taken on the phone arrives on the tablet as a concept with no bank — no
+  // exercises, therefore no answers, therefore no mastery, therefore a strand that never
+  // moves again. Writing the missing bank in the background closes that loop. It costs one
+  // cheap call, once per device per concept, and nothing waits on it.
+  const missing = grammarOn ? learningTopics(mem).filter(id => !cachedCourse(id)) : [];
+  const repair = missing.join(',');
+  useEffect(() => {
+    if (!repair) return;
+    const byId = compById(mem.profile.target);
+    let live = true;
+    void (async () => {
+      for (const id of missing) {
+        if (!live || !byId[id]) return;
+        try { await makeCourse(mem, byId[id]); } catch { return; /* offline; try again tomorrow */ }
+      }
+    })();
+    return () => { live = false; };
+  }, [repair]);
   const rs = peekRevState(); // interrupted session to resume, if any
   const ready = api.ready();
   const levelKnown = !intro || mem.cefr.history.length > 0;
@@ -119,9 +158,7 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
 
   const proposal: Chosen = intro
     ? { t: INTRO[Math.min(introN, 2)].t, fr: INTRO[Math.min(introN, 2)].fr, lv: '' }
-    : custom.trim()
-      ? { t: custom.trim(), fr: custom.trim(), lv: band(mem.cefr.overall) }
-      : pick(suggestions[si % Math.max(1, suggestions.length)], S, band(mem.cefr.overall));
+    : pick(suggestions[0], S, band(mem.cefr.overall));
 
   // Ear-training phase (first two weeks at A0/A1): perception is the main course,
   // the call stays short (Fluent Forever's ordering: ears before mouth).
@@ -175,6 +212,7 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
             <button class="hchip" onClick={() => go('memory')}>
               {skipped ? S.today.daysMissed(skipped) : S.today.daysRow(mem.streak.count || 0)}
             </button>
+            {ext && <ext.TodayChip open={() => go('companion')} />}
             <button class="hchip" title={S.nav.settings} onClick={() => go('profiles')}>{(mem.profile.name || '?')[0]}</button>
           </div>
         </div>
@@ -196,28 +234,11 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
           </div>
         </div>
 
-        {!intro && (
-          <div class="hrow">
-            <button class="pill" onClick={() => { setCustom(''); setSi(si + 1); }}><I.shuffle /> {S.today.otherIdea}</button>
-            <button class="pill" onClick={() => setShowCustom(!showCustom)}>{S.today.freeTopic}</button>
-          </div>
-        )}
-        {showCustom && !intro && (
-          <input placeholder={S.today.freePlaceholder} value={custom}
-            onInput={e => setCustom((e.target as HTMLInputElement).value)} />
-        )}
-        {/* Cheat sheets and the warm-up are both pre-call, both optional: one line
-            between them, not two, so the day still fits a phone. */}
-        {(sheets.length > 0 || (!callDone && queueLen > 0)) && (
+        {sheets.length > 0 && (
           <div class="prerow">
-            {sheets.length > 0 && (
-              <button class="matbtn" onClick={() => setShowSheets(true)}>
-                📄 {sheets.map(x => x.title).join(' · ')}
-              </button>
-            )}
-            {!callDone && queueLen > 0 && (
-              <button class="btn subtle warmbtn" title={S.today.warmup} onClick={warmup}>{S.today.warmupShort}</button>
-            )}
+            <button class="matbtn" onClick={() => setShowSheets(true)}>
+              📄 {sheets.map(x => x.title).join(' · ')}
+            </button>
           </div>
         )}
         {!ready && (
@@ -254,6 +275,32 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
       {/* Ear training is the day itself during the A0/A1 fortnight, an extra above it after. */}
       {ear && <div style="margin-top:16px">{pronCard}</div>}
 
+      {/* Grammar: the third thing the day asks for, after the conversation and the cards.
+          One concept at a time, taken off the competency map — worst gap at or below the
+          learner's own band first. Before the course it offers the lesson; after it, the
+          fiche, because that is what the same button means once the lesson has been sat
+          through. */}
+      {grammarOn && gram && (
+        <div class="daycard" style="margin-top:16px">
+          <div class="head">
+            <span class="kicker">{S.gram.kicker}</span>
+            <span class="lvl">{gram.item.band}</span>
+          </div>
+          <div style="font-family:var(--disp);font-weight:800;font-size:19px;line-height:1.2" lang={mem.profile.target}>
+            {gram.item.label}
+          </div>
+          {gram.topic && (() => {
+            const t = drillTally(gram.topic);
+            return <p class="muted" style="font-size:13px;margin:0;line-height:1.5">
+              {t.tries ? S.gram.since(t.ok, t.tries) : S.gram.fresh}
+            </p>;
+          })()}
+          <button class={'btn big ' + (gram.topic ? 'subtle' : 'ghost')} onClick={() => go('grammar')}>
+            {gram.topic ? S.gram.sheet : <>{S.gram.start} · {S.gram.minutes}</>}
+          </button>
+        </div>
+      )}
+
       {/* What came out of the calls, in the colour the system reserves for it. Two sittings
           a day at whatever hour suits, so it is named for the act, not for the evening. */}
       <div class="reviewblock">
@@ -263,6 +310,7 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
               stops at 2/2 while the block still offers cards reads as a broken promise. */}
           <div class="n">
             {queueLen === 0 ? S.today.nothingToReview : S.today.nCards(queueLen)}
+            {queueLen > 0 && gramDrills > 0 && S.gram.extra(gramDrills)}
             {queueLen > 0 && revRounds > 1 && ' · ' + (revToday >= revRounds
               ? S.today.roundExtra(revToday + 1)
               : S.today.roundOf(revToday + 1, revRounds))}

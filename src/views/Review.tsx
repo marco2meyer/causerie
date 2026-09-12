@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Correction, CostLeg, Highlight, Memory, SessionRecord, VocabItem } from '../types';
 import { cardFromCorrection, conceptKey, findCorrectionCard, findVocabCard, recognitionCards, sameConceptCards, vocabCards } from '../lib/srs';
+import { analysable } from '../lib/reanalyse';
 import { saveMem } from '../lib/storage';
 import { deepClone, fmtDay, norm } from '../lib/utils';
 import { Odile } from '../components/Avatar';
@@ -99,6 +100,9 @@ interface Props {
   go: (view: string) => void;
   /** Opens the deck on top of this conversation; leaving it comes back here. */
   openCards: () => void;
+  /** Analyse this call now: offered on a call kept without an analysis (the model failed,
+   *  or the evening was over before it came back). Absent where there is nothing to run. */
+  onReanalyse?: () => void;
   toast: ToastFn;
 }
 
@@ -124,7 +128,7 @@ function Notice({ c, showLabel, lang }: { c: Correction; showLabel: string; lang
   );
 }
 
-export function Review({ mem, setMem, sess, live, go, openCards, toast }: Props) {
+export function Review({ mem, setMem, sess, live, go, openCards, onReanalyse, toast }: Props) {
   const S = ui();
   const [pzId, setPzId] = useState<string | null>(null);
   const [forgeSeed, setForgeSeed] = useState<{ text: string; turnId?: string } | null>(null);
@@ -397,6 +401,21 @@ export function Review({ mem, setMem, sess, live, go, openCards, toast }: Props)
         <div class="card">
           <div class="muted">{S.review.noAnalysis}{sess.source === 'duolingo' ? S.review.duoImport : ''}.</div>
           {sess.summary && <div style="margin-top:8px;font-size:14.5px;line-height:1.55">{sess.summary}</div>}
+          {/* The conversation itself is kept, so the analysis is only late, never lost: it
+              can be read now, from this record, however long ago the call was. */}
+          {onReanalyse && analysable(sess) && (
+            <div style="margin-top:12px">
+              <div class="tiny" style="line-height:1.5">{S.review.analyseLater}</div>
+              <button class="btn primary" style="margin-top:10px" onClick={onReanalyse}>{S.review.analyseNow}</button>
+            </div>
+          )}
+          {sess.verbatim && (
+            <details style="margin-top:12px">
+              <summary style="font-weight:650;cursor:pointer">{S.review.verbatimTitle}</summary>
+              <div class="tiny" style="margin:6px 0 8px;line-height:1.5">{S.review.verbatimNote}</div>
+              <div style="font-size:14px;line-height:1.6;white-space:pre-wrap" lang={mem.profile.target}>{sess.verbatim}</div>
+            </details>
+          )}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type AuthChangeEvent, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import type { Memory } from '../types';
 
 /** Supabase backing: accounts (Google / e-mail code), per-user profile storage and the
@@ -21,7 +21,7 @@ function conf(): { url: string; key: string } | null {
 
 let client: SupabaseClient | null = null;
 let session: Session | null = null;
-const listeners = new Set<(s: Session | null) => void>();
+const listeners = new Set<(s: Session | null, event: AuthChangeEvent) => void>();
 
 export function supaEnabled(): boolean {
   return conf() !== null;
@@ -34,9 +34,9 @@ function getClient(): SupabaseClient | null {
     client = createClient(c.url, c.key, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'causerie.supa' }
     });
-    client.auth.onAuthStateChange((_e, s) => {
+    client.auth.onAuthStateChange((e, s) => {
       session = s;
-      listeners.forEach(fn => fn(s));
+      listeners.forEach(fn => fn(s, e));
     });
   }
   return client;
@@ -58,7 +58,9 @@ export function supaClient(): SupabaseClient | null { return getClient(); }
 export function supaSession(): Session | null { return session; }
 export function supaEmail(): string { return session?.user?.email?.toLowerCase() || ''; }
 export function supaToken(): string { return session?.access_token || ''; }
-export function onSupaChange(fn: (s: Session | null) => void): () => void {
+/** Every auth change, with the client's own event name: INITIAL_SESSION is the stored
+ *  session at boot (the same one supaInit answers), SIGNED_IN, TOKEN_REFRESHED, SIGNED_OUT. */
+export function onSupaChange(fn: (s: Session | null, event: AuthChangeEvent) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }

@@ -6,9 +6,9 @@ import { focusTargets } from '../lib/focus';
 import { inIntroPhase, introCallsDone } from '../lib/gamify';
 import { portrait } from '../lib/portrait';
 import { buildTutorPrompt, TEMPLATE_VARS } from '../lib/prompts';
-import { activeProfile, deleteProfile } from '../lib/profiles';
+import { activeProfile, deleteProfile, forgetProfileElsewhere } from '../lib/profiles';
 import { migrate, saveMem, wipeMem } from '../lib/storage';
-import { deleteRemote } from '../lib/sync';
+import type { CompanionModule } from '../lib/companionSeam';
 import { findVocabCard, recognitionCards, vocabCards } from '../lib/srs';
 import { introTopics, suggestTopics } from '../lib/topics';
 import { deepClone, download, fmtDate, fmtMonth, norm, todayISO } from '../lib/utils';
@@ -25,6 +25,8 @@ interface Props {
   openSession: (id: string) => void;
   openCheckin: (p: 'week' | 'month' | 'quarter') => void;
   toast: ToastFn;
+  /** The optional extension, so "forget everything" also ends what it was running. */
+  ext?: CompanionModule | null;
 }
 
 /** Nine tabs was a filing cabinet. These six are the questions actually being asked:
@@ -42,7 +44,7 @@ const Section = ({ title, sub }: { title: string; sub?: string }) => (
   </div>
 );
 
-export function MemoryView({ mem, setMem, openSession, openCheckin, toast }: Props) {
+export function MemoryView({ mem, setMem, openSession, openCheckin, toast, ext }: Props) {
   const S = ui();
   const BY_ID = compById(mem.profile.target);
   const CATS = [['grammaire', S.memory.catGrammar], ['vocabulaire', S.memory.catVocab], ['fonctions', S.memory.catSpeak]] as const;
@@ -545,15 +547,15 @@ export function MemoryView({ mem, setMem, openSession, openCheckin, toast }: Pro
             </button>
             <button class="btn danger" onClick={() => void (async () => {
               if (!confirm(S.memory.forgetAllConfirm)) return;
-              // The server copy goes first: a local-only wipe with a surviving blob
-              // would silently keep everything restorable.
-              const tok = mem.sync?.token;
-              if (tok && mem.sync?.enabled) {
-                const ok = await deleteRemote(tok);
-                if (!ok && !confirm(S.memory.serverWipeFailed)) return;
-              }
+              // Everything that lives elsewhere goes first — the server copy, and anything
+              // the extension was running for this profile: a local-only wipe would leave
+              // both, one silently restorable and the other still writing.
               const ap = activeProfile();
-              if (ap) deleteProfile(ap.id); else wipeMem(); // registry entry too: no ghost profiles
+              if (ap) {
+                const r = await forgetProfileElsewhere(ap.id, ext);
+                if ((!r.remote || !r.extension) && !confirm(S.memory.serverWipeFailed)) return;
+                deleteProfile(ap.id); // registry entry too: no ghost profiles
+              } else wipeMem();
               location.reload();
             })()}>
               {S.memory.forgetAll}

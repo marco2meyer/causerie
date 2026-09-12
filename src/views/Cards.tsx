@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { Card, Memory } from '../types';
+import { withSittingBonus, type CompanionModule } from '../lib/companionSeam';
 import { peekRevState } from '../lib/revstate';
 import { beyondPlan, sittingPlan } from '../lib/budget';
 import { reviewSessionsOn } from '../lib/gamify';
@@ -29,6 +30,8 @@ interface Props {
    *  singling out the last call's cards there says "look at these" to someone who came to
    *  look at something else. */
   fromCall?: boolean;
+  /** Optional extension module: it may widen the sitting while it feeds the deck. */
+  ext?: CompanionModule | null;
 }
 
 const EMPTY: ReadonlySet<string> = new Set();
@@ -52,7 +55,7 @@ function statusRank(c: Card): number {
   return 3;
 }
 
-export function Cards({ mem, setMem, go, toast, onBack, fromCall }: Props) {
+export function Cards({ mem, setMem, go, toast, onBack, fromCall, ext }: Props) {
   const S = ui();
   const T = (mem.profile.target || 'fr').toUpperCase();
   const N = (mem.profile.native || 'de').toUpperCase();
@@ -67,8 +70,9 @@ export function Cards({ mem, setMem, go, toast, onBack, fromCall }: Props) {
   /** Measured, not configured: what the last week actually looked like (lib/pace). */
   const pace = useMemo(() => deckPace(mem), [mem.deck.cards, mem.deck.log]);
   const sittings = reviewSessionsOn(mem, todayISO());
-  const plan = sittingPlan(mem, sittings, todayISO());
-  const queueLen = buildSession(mem.deck, mem.settings.sessionSize, plan.newCap,
+  const planned = withSittingBonus(mem, ext);
+  const plan = sittingPlan(planned, sittings, todayISO());
+  const queueLen = buildSession(mem.deck, planned.settings.sessionSize, plan.newCap,
     todayISO(), beyondPlan(mem.settings, sittings), plan.dueCap).length;
   const rs = peekRevState(); // interrupted session to resume, if any
   const update = (fn: (m: Memory) => void) => {

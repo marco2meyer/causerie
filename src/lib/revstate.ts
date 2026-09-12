@@ -1,5 +1,6 @@
-import type { Grade } from '../types';
+import type { Grade, GrammarDrill } from '../types';
 import { activeProfile } from './profiles';
+import { drillId, isDrillId } from './grammar';
 import { todayISO } from './utils';
 
 /** Mid-session persistence for the review session: a reload (train transfer, tab
@@ -16,6 +17,13 @@ export interface RevState {
   /** Seconds spent before the last save, so the log's duration survives the reload. */
   elapsed: number;
   date: string;
+  /** The grammar exercises interleaved into this sitting, in queue order. They exist only
+   *  for the sitting — there is no deck to look them up in — so the saved session has to
+   *  carry them or a reload drops them out of a queue that still holds their ids. */
+  drills?: GrammarDrill[];
+  /** What those exercises showed, banked until the sitting ends and writes them to the
+   *  concepts they belong to. */
+  drillLog?: { topic: string; right: boolean }[];
 }
 
 const key = () => 'causerie.revstate:' + (activeProfile()?.id ?? 'solo');
@@ -31,7 +39,10 @@ export function loadRevState(existingIds: Set<string>): RevState | null {
     if (!raw) return null;
     const s = JSON.parse(raw) as RevState;
     if (s.date !== todayISO() || !Array.isArray(s.queue) || s.queue.length === 0) { clearRevState(); return null; }
-    s.queue = s.queue.filter(id => existingIds.has(id));
+    // A queue id is either a card, which must still be in the deck, or one of this sitting's
+    // own grammar exercises, which live in the saved state rather than in the deck.
+    const drills = new Set((s.drills ?? []).map((_, i) => drillId(i)));
+    s.queue = s.queue.filter(id => (isDrillId(id) ? drills.has(id) : existingIds.has(id)));
     if (!s.queue.length) { clearRevState(); return null; }
     return s;
   } catch { return null; }

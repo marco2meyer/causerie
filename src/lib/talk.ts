@@ -30,6 +30,8 @@ export function tutorShare(transcript: TranscriptItem[] | undefined): number | n
 export const TALK_TARGET = 0.45;
 /** Past this it is not a conversation the student is having, it is one he is watching. */
 export const TALK_HIGH = 0.55;
+/** A run of calls averaging past this is a habit, even when no single call was alarming. */
+export const TALK_RUN = 0.5;
 
 /** Her share across the last few calls, which is what the briefing should react to: one
  *  talkative call is a call, three in a row is a habit. */
@@ -40,6 +42,22 @@ export function recentTutorShare(mem: Memory, n = 4): number | null {
     .filter((x): x is number => typeof x === 'number');
   if (shares.length < 2) return null;              // one call is not a tendency
   return shares.reduce((a, b) => a + b, 0) / shares.length;
+}
+
+/** The average alone never reached the briefing: a 63% call sat beside three balanced ones
+ *  and came out at 49%, under every threshold, so the one call that went wrong was never
+ *  mentioned to her. Two ways in now — the LAST call past TALK_HIGH, or a run of calls
+ *  averaging past TALK_TARGET — and the figure she is shown is the one that tripped it. */
+export function talkAlert(mem: Memory, n = 4): number | null {
+  const shares = (mem.sessions ?? [])
+    .slice(-n)
+    .map(s => (typeof s.tutorShare === 'number' ? s.tutorShare : tutorShare(s.transcript)))
+    .filter((x): x is number => typeof x === 'number');
+  const last = shares.length ? shares[shares.length - 1] : null;
+  if (last !== null && last > TALK_HIGH) return last;
+  if (shares.length < 2) return null;              // one call is not a tendency
+  const avg = shares.reduce((a, b) => a + b, 0) / shares.length;
+  return avg > TALK_RUN ? avg : null;
 }
 
 export type TalkVerdict = 'good' | 'high' | 'hogging';

@@ -26,8 +26,8 @@ function ruleBody(selector: string): string {
 
 describe('surfaces that can sit on the call screen', () => {
   // .card is the sheet's inner panels, .sheetcard the overlay itself, .sheet its
-  // full-screen cousin.
-  for (const sel of ['.card', '.sheetcard', '.sheet']) {
+  // full-screen cousin, .viz the framed drawing a grammar fiche puts inside any of them.
+  for (const sel of ['.card', '.sheetcard', '.sheet', '.viz']) {
     it(`${sel} states its own text colour, not just its background`, () => {
       const body = ruleBody(sel);
       expect(body, `${sel} sets no background`).toMatch(/background:/);

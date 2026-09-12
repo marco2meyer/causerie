@@ -1,6 +1,7 @@
 import type { LangCode, Memory } from '../types';
 import { setDateLocale } from '../lib/utils';
 import type { LangPack } from './types';
+import { tutorize, type TutorIdentity } from './tutor';
 import { fr, type UIStrings } from './fr';
 import { es } from './es';
 import { it } from './it';
@@ -30,14 +31,36 @@ export function setUiLang(code?: string): void {
   if (typeof document !== 'undefined') document.documentElement.lang = current;
 }
 
+/* The packs are written for Odile; when another tutor takes the calls, every string that
+ * comes out of pack()/ui() is rewritten for them (lang/tutor.ts). The rewrite runs once
+ * per (language, tutor) and is cached; with Odile it costs nothing at all. app.tsx keeps
+ * this in step with the active profile the same way it does setUiLang. */
+let tutorId: TutorIdentity = { key: 'odile', name: 'Odile', gender: 'f' };
+const tutorized = new WeakMap<object, { key: string; value: unknown }>();
+
+export function setTutor(t: TutorIdentity): void {
+  tutorId = t;
+}
+
+function forTutor<T extends object>(obj: T, lang: string): T {
+  if (tutorId.key === 'odile') return obj;
+  const hit = tutorized.get(obj);
+  if (hit && hit.key === tutorId.key) return hit.value as T;
+  const value = tutorize(obj, lang, tutorId);
+  tutorized.set(obj, { key: tutorId.key, value });
+  return value;
+}
+
 /** The content pack for an explicit language, or the active UI language when omitted
  *  (falls back to French when the UI runs in a support-only language like German). */
 export function pack(code?: string): LangPack {
   const c = code && PACKS[code as LangCode] ? (code as LangCode) : current;
-  return PACKS[c as LangCode] ?? PACKS.fr;
+  const p = PACKS[c as LangCode] ?? PACKS.fr;
+  return forTutor(p, p.code);
 }
 
-export const ui = (): UIStrings => (current === 'de' ? UI_ONLY.de : PACKS[current as LangCode].ui);
+export const ui = (): UIStrings =>
+  current === 'de' ? forTutor(UI_ONLY.de, 'de') : forTutor(PACKS[current as LangCode].ui, current);
 
 /** The UI language currently in effect. */
 export const uiLangCode = (): UiLangCode => current;

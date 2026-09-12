@@ -14,6 +14,13 @@ export function smooth(oldIdx: number, newIdx: number, conf: number | undefined)
 }
 
 export interface SessionMeta {
+  /** The record this analysis belongs to: the call is written down the moment it ends, so
+   *  the analysis fills that record in rather than adding a second one. A fresh id is
+   *  minted when absent (an import, a test). */
+  id?: string;
+  /** The day the call happened, when that is not today: an analysis can run days later
+   *  (lib/reanalyse), and the record must keep the date of the conversation. */
+  date?: string;
   topic: string;
   targets?: FocusTarget[];
   transcript?: TranscriptItem[];
@@ -38,7 +45,7 @@ export interface SessionMeta {
  *  This is the gap-closing core: weakness statuses evolve, levels smooth toward the new
  *  estimate, interests/vocab accumulate, XP and streak update. */
 export function applyAnalysis(mem: Memory, an: Analysis, sessMeta: SessionMeta): SessionRecord {
-  const d = todayISO();
+  const d = sessMeta.date || todayISO();
   const RS = pack(mem.profile.target).tutor.records;
   const ci = (s: string) => {
     const i = LEVELS.indexOf(s as (typeof LEVELS)[number]);
@@ -165,7 +172,7 @@ export function applyAnalysis(mem: Memory, an: Analysis, sessMeta: SessionMeta):
   mem.xp = (mem.xp || 0) + xp;
   touchStreak(mem, d);
 
-  const sessId = uid('sess');
+  const sessId = sessMeta.id || uid('sess');
   // Runs after the level has smoothed: the call that lifts the learner to A2 is the call
   // that retires the recognition half of their deck. Latched, so this is a no-op after that.
   retireRecognition(mem);
@@ -189,6 +196,11 @@ export function applyAnalysis(mem: Memory, an: Analysis, sessMeta: SessionMeta):
     ...(sessMeta.briefing ? { briefing: sessMeta.briefing } : {}),
     summary: an.topics?.length ? RS.themes + an.topics.join(', ') + '. ' + (an.hauptpunkt || '') : (an.hauptpunkt || '')
   };
-  mem.sessions.push(rec);
-  return rec;
+  // The call was written down when it ended: this fills that record in, keeping the hour it
+  // really happened at and whatever the analysis has nothing to say about (its audio, its
+  // cost legs). Only an import or a test arrives here without a record of its own.
+  const i = mem.sessions.findIndex(s => s.id === sessId);
+  if (i < 0) mem.sessions.push(rec);
+  else mem.sessions[i] = { ...mem.sessions[i], ...rec, at: mem.sessions[i].at || rec.at, date: mem.sessions[i].date || rec.date };
+  return mem.sessions[i < 0 ? mem.sessions.length - 1 : i];
 }

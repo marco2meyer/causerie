@@ -1,0 +1,14 @@
+# Paths kept out of the public snapshot (private extensions).
+#
+# One path per line, relative to the repository root. `*` matches within one path
+# segment, `**` across segments; a trailing slash means the whole directory. Blank lines
+# and lines starting with # are ignored. Read by scripts/publish-public.sh (which removes
+# these from the public branch) and scripts/check-public-bundle.mjs (which proves the tree
+# still type-checks, tests and builds without them, and that the bundle carries no trace).
+netlify/functions/companion-*.mjs
+netlify/functions/lib/companion/
+src/lib/companion/
+docs/companion/
+scripts/companion-setup.mjs
+tests/unit/companion/
+.publicforbidden
