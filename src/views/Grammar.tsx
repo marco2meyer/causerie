@@ -93,24 +93,31 @@ function Course({ mem, setMem, item, toast, onExit, onDone, fresh }: {
   const [typed, setTyped] = useState('');
   const [verdict, setVerdict] = useState<'right' | 'accent' | 'wrong' | null>(null);
   const [finished, setFinished] = useState(false);
+  /** Why the last attempt failed, shown quietly under the message. A lesson that will not
+   *  come is a dead end on a phone, where there is no console to ask. */
+  const [why, setWhy] = useState('');
+  const [tries, setTries] = useState(0);
   const memRef = useRef(mem);
   memRef.current = mem;
 
   useEffect(() => {
     if (course) return;
     let live = true;
-    makeCourse(mem, item, fresh)
-      .then(c => { if (live) { setCourse(c); setBusy(false); forgetGuide(item.id); } })
-      .catch(() => {
+    setBusy(true);
+    setWhy('');
+    makeCourse(mem, item, fresh && tries === 0)
+      .then(c => { if (live) { setCourse(c); setBusy(false); if (fresh) forgetGuide(item.id); } })
+      .catch((e: unknown) => {
         if (!live) return;
         setBusy(false);
         // The replacement never came. Fall back to the cached lesson rather than leaving the
         // concept with nothing — and with no bank for tonight's sitting.
         const kept = cachedCourse(item.id);
-        if (kept) setCourse(kept); else toast(S.gram.fail, true);
+        if (kept) { setCourse(kept); return; }
+        setWhy(String((e as Error)?.message ?? e).slice(0, 160));
       });
     return () => { live = false; };
-  }, []);
+  }, [tries]);
 
   const steps = course?.steps ?? [];
   const step: CourseStep | undefined = steps[i];
@@ -173,8 +180,14 @@ function Course({ mem, setMem, item, toast, onExit, onDone, fresh }: {
         </div>
         <div class="gr-empty">
           <h2 style="font-size:24px;margin:0">{S.gram.fail}</h2>
+          {/* The reason, small and out of the way. Nobody wants it, and the one person who
+              does is holding a phone with no console when the lesson will not come. */}
+          {why && <div class="tiny" style="max-width:380px;word-break:break-word">{why}</div>}
         </div>
-        <div class="rev-actions"><button class="cta ink solo" onClick={onExit}>{S.common.back}</button></div>
+        <div class="rev-actions" style="display:flex;flex-direction:column;gap:9px">
+          <button class="cta solo" onClick={() => setTries(t => t + 1)}>{S.common.retry}</button>
+          <button class="btn subtle big" onClick={onExit}>{S.common.back}</button>
+        </div>
       </div>
     );
   }

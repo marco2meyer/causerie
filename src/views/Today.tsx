@@ -13,7 +13,7 @@ import { daysSkipped } from '../lib/month';
 import { beyondPlan, sessionsPerDay, sittingPlan } from '../lib/budget';
 import { buildSession } from '../lib/srs';
 import { drillCount, drillTally, grammarFocus, learningTopics } from '../lib/grammar';
-import { banksFor, cachedCourse, makeCourse } from '../lib/course';
+import { banksFor, cachedCourse, warm } from '../lib/course';
 import { compById } from '../lib/competencies';
 import { sheetsForCall, type CheatSheet } from '../lib/sheets';
 import { goalCount, pickWordGoals } from '../lib/wordgoal';
@@ -128,27 +128,48 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
     const stock = Object.values(banks).reduce((n, b) => n + b.length, 0);
     return Math.min(stock, drillCount(mem.settings, queueLen));
   })();
-  // Which concepts are being drilled syncs; the exercises themselves are cached per device.
-  // So a lesson taken on the phone arrives on the tablet as a concept with no bank — no
-  // exercises, therefore no answers, therefore no mastery, therefore a strand that never
-  // moves again. Writing the missing bank in the background closes that loop. It costs one
-  // cheap call, once per device per concept, and nothing waits on it.
-  const missing = grammarOn ? learningTopics(mem).filter(id => !cachedCourse(id)) : [];
-  const repair = missing.join(',');
+  const ready = api.ready();
+  // Everything the grammar strand will need, written BEFORE it is asked for.
+  //
+  //  · whatever the button itself would open — the lesson for a concept not yet taught, the
+  //    fiche for one that has been. A lesson written only when the button is pressed spends
+  //    several seconds of the five minutes it promises on a spinner.
+  //  · the exercise bank of every concept still being drilled. Which concepts those are
+  //    syncs across devices; the exercises do not, so a lesson taken on the phone reaches
+  //    the tablet as a concept with no exercises — no answers, therefore no mastery,
+  //    therefore a strand that never moves again.
+  //
+  // Nothing waits on any of it, each piece is written once, and a failure rests for ten
+  // minutes rather than being retried on every render (lib/course warm).
+  const warmJobs = useMemo(() => {
+    if (!grammarOn || !ready) return [] as { id: string; want: 'course' | 'bank' | 'guide' }[];
+    const byId = compById(mem.profile.target);
+    const jobs: { id: string; want: 'course' | 'bank' | 'guide' }[] = [];
+    const add = (id: string, want: 'course' | 'bank' | 'guide') => {
+      if (byId[id] && !jobs.some(j => j.id === id && j.want === want)) jobs.push({ id, want });
+    };
+    if (gram) add(gram.item.id, gram.topic ? 'guide' : 'course');
+    for (const id of learningTopics(mem)) {
+      if (!cachedCourse(id)) add(id, 'course');
+      else if (!(banksFor([id])[id] ?? []).length) add(id, 'bank');
+    }
+    return jobs;
+  }, [mem, grammarOn, ready, gram]);
+  const warmKey = warmJobs.map(j => j.want + ':' + j.id).join(',');
   useEffect(() => {
-    if (!repair) return;
+    if (!warmKey) return;
     const byId = compById(mem.profile.target);
     let live = true;
     void (async () => {
-      for (const id of missing) {
-        if (!live || !byId[id]) return;
-        try { await makeCourse(mem, byId[id]); } catch { return; /* offline; try again tomorrow */ }
+      // One at a time: three lessons at once on a phone's connection is three slow lessons.
+      for (const j of warmJobs) {
+        if (!live) return;
+        await warm(mem, byId[j.id], j.want);
       }
     })();
     return () => { live = false; };
-  }, [repair]);
+  }, [warmKey]);
   const rs = peekRevState(); // interrupted session to resume, if any
-  const ready = api.ready();
   const levelKnown = !intro || mem.cefr.history.length > 0;
   const checkinDue = useMemo(() => dueCheckin(mem), [mem]);
   // Days rather than a score: a run that is live says how long it has been, a run that

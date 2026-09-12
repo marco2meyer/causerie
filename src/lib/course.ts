@@ -1,4 +1,4 @@
-import type { GrammarCourse, GrammarDrill, GrammarGuide, Memory } from '../types';
+import type { CourseStep, GrammarCourse, GrammarDrill, GrammarGuide, GrammarViz, Memory } from '../types';
 import { api, OAI } from './api';
 import { pack } from '../lang';
 import type { CompItem } from './competencies';
@@ -65,9 +65,27 @@ async function chat(body: unknown): Promise<string> {
       headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + api.getKey() },
       body: JSON.stringify(body)
     });
-  if (!r.ok) throw new Error('llm ' + r.status);
+  if (!r.ok) {
+    // The proxy forwards OpenAI's status AND its body on the non-streamed path, and the
+    // body is the only thing that ever says WHY — a rejected schema names the offending
+    // field. Throwing the status alone is what left this undiagnosable from a phone.
+    const detail = await r.text().catch(() => '');
+    throw new Error('llm ' + r.status + (detail ? ': ' + detail.replace(/\s+/g, ' ').slice(0, 200) : ''));
+  }
   const j = await r.json();
-  return j.choices?.[0]?.message?.content ?? '';
+  const choice = j.choices?.[0];
+  // A reasoning model that runs out of room stops mid-object, and the JSON.parse that
+  // follows fails with a syntax error that says nothing about the cause. Name it here.
+  if (choice?.finish_reason === 'length') throw new Error('llm truncated (finish_reason=length)');
+  if (choice?.message?.refusal) throw new Error('llm refused: ' + String(choice.message.refusal).slice(0, 120));
+  return choice?.message?.content ?? '';
+}
+
+/** Parses a structured reply, saying which call failed rather than letting a bare
+ *  SyntaxError reach the screen. */
+function parseReply<T>(content: string, what: string): T {
+  if (!content.trim()) throw new Error(what + ': empty reply');
+  try { return JSON.parse(content) as T; } catch { throw new Error(what + ': unparseable reply'); }
 }
 
 /* ---------- schemas ---------- */
@@ -77,9 +95,9 @@ const ARR = (items: unknown, description?: string) => ({ type: 'array', items, .
 
 const EXAMPLES = ARR({
   type: 'object', additionalProperties: false,
-  properties: { t: S('the sentence, in the target language'), gloss: S('its gloss in the support language') },
+  properties: { t: S('the sentence, in the target language'), gloss: S('what it means, in the support language. ALWAYS give it: the learner is being asked to reason from these sentences, and one they cannot read is not evidence.') },
   required: ['t', 'gloss']
-});
+}, 'The sentences this step is ABOUT, printed above the question. REQUIRED — 3 or 4 of them — on every `discover` step and on any step whose wording refers to "these sentences": they ARE the evidence the learner reasons from, and a question about sentences that were never shown is a broken screen. Empty only on `rule`, `recap` and a bare `gap`.');
 
 /** The fixed menu of drawings. Every field is required because the schema is strict; the
  *  ones the chosen `kind` does not use come back empty, which is what the renderer expects. */
@@ -140,8 +158,21 @@ const DRILL = {
   required: ['kind', 'prompt', 'text', 'options', 'answer', 'explain']
 };
 
-const COURSE_SCHEMA = {
-  name: 'grammar_course',
+/** The diagrams, lifted OUT of the steps they belong to.
+ *
+ *  Nested inside every step, a strict schema made each of the eight emit all nine viz
+ *  fields even to say "no drawing here" — several hundred tokens of `[]` per lesson, on the
+ *  one call that was already the largest thing this app asks for. As a short list at the top
+ *  level, keyed by the step it belongs to, only the one or two steps that actually have a
+ *  drawing cost anything, and the schema is two levels shallower besides. */
+const VIZ_AT = {
+  ...VIZ,
+  properties: { step: { type: 'integer', description: '0-based index of the step this belongs to' }, ...VIZ.properties },
+  required: ['step', ...VIZ.required]
+};
+
+export const LESSON_SCHEMA = {
+  name: 'grammar_lesson',
   strict: true,
   schema: {
     type: 'object',
@@ -155,7 +186,6 @@ const COURSE_SCHEMA = {
           kind: { type: 'string', enum: ['discover', 'choice', 'gap', 'rule', 'recap'] },
           prompt: S('the question, or the heading on a rule/recap screen; support language'),
           examples: EXAMPLES,
-          viz: VIZ,
           options: ARR(S(), 'discover/choice: 3-4 short options, exactly one right. Empty otherwise.'),
           correct: { type: 'integer', description: '0-based index of the right option; 0 when there are none' },
           text: S('gap: the sentence with exactly one ___. Empty otherwise.'),
@@ -163,15 +193,29 @@ const COURSE_SCHEMA = {
           lines: ARR(S(), 'rule/recap: at most five short lines. Empty otherwise.'),
           explain: S('shown once answered, or straight away on a rule screen: WHY, in 1-2 lines')
         },
-        required: ['kind', 'prompt', 'examples', 'viz', 'options', 'correct', 'text', 'answer', 'lines', 'explain']
+        required: ['kind', 'prompt', 'examples', 'options', 'correct', 'text', 'answer', 'lines', 'explain']
       }),
-      bank: ARR(DRILL)
+      viz: ARR(VIZ_AT, 'AT MOST TWO drawings for the whole lesson, each naming its step. Empty when none earns its place.')
     },
-    required: ['title', 'why', 'steps', 'bank']
+    required: ['title', 'why', 'steps', 'viz']
   }
 } as const;
 
-const GUIDE_SCHEMA = {
+/** The exercise bank, asked for separately. It is not needed until the lesson has been sat
+ *  through, and asking for it in the same breath doubled the size of the one response this
+ *  app waits on — the proxy buffers a non-streamed reply, and a reply that takes too long to
+ *  finish is a reply nobody ever sees. */
+export const BANK_SCHEMA = {
+  name: 'grammar_bank',
+  strict: true,
+  schema: {
+    type: 'object', additionalProperties: false,
+    properties: { bank: ARR(DRILL) },
+    required: ['bank']
+  }
+} as const;
+
+export const GUIDE_SCHEMA = {
   name: 'grammar_guide',
   strict: true,
   schema: {
@@ -185,13 +229,13 @@ const GUIDE_SCHEMA = {
           title: S('what this page covers, support language'),
           lines: ARR(S(), 'the substance, at most eight short lines'),
           examples: EXAMPLES,
-          viz: VIZ,
           traps: ARR(S(), 'mistakes a speaker of the learner’s language actually makes here')
         },
-        required: ['title', 'lines', 'examples', 'viz', 'traps']
-      })
+        required: ['title', 'lines', 'examples', 'traps']
+      }),
+      viz: ARR(VIZ_AT, 'at most one drawing per page, each naming its page in `step`. Empty when none earns its place.')
     },
-    required: ['title', 'pages']
+    required: ['title', 'pages', 'viz']
   }
 } as const;
 
@@ -257,6 +301,39 @@ function learnerBrief(mem: Memory, item: CompItem): string {
   ].join('\n');
 }
 
+/* ---------- one call at a time ---------- */
+
+const inFlight = new Map<string, Promise<unknown>>();
+const failedAt = new Map<string, number>();
+/** How long a concept is left alone after a failed attempt, so a flat network is not asked
+ *  the same expensive question on every visit to the day screen. Same figure lib/topicgen
+ *  settled on for the same reason. */
+const RETRY_AFTER_MS = 10 * 60 * 1000;
+
+/** Runs `work` once per key: a second caller joins the call already in the air instead of
+ *  starting another.
+ *
+ *  This is the whole of what makes a warmed lesson worth warming. The day screen starts
+ *  writing the lesson as soon as it knows which one the button means; if the student taps
+ *  before it lands, the button AWAITS that same call rather than firing a duplicate — so the
+ *  tap costs whatever is left of the wait, never a second one, and never a second bill. */
+function share<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const running = inFlight.get(key) as Promise<T> | undefined;
+  if (running) return running;
+  const p = work()
+    .catch(e => { failedAt.set(key, Date.now()); throw e; })
+    .finally(() => { inFlight.delete(key); });
+  inFlight.set(key, p);
+  return p;
+}
+
+/** Is this key resting after a recent failure? Consulted only by the background warming —
+ *  a student who taps the button is asking for it now, and gets a real attempt. */
+const resting = (key: string): boolean => {
+  const f = failedAt.get(key);
+  return !!f && Date.now() - f < RETRY_AFTER_MS;
+};
+
 /* ---------- courses ---------- */
 
 export function cachedCourse(id: string): GrammarCourse | null {
@@ -283,11 +360,15 @@ export function banksFor(ids: string[]): Record<string, GrammarDrill[]> {
   return out;
 }
 
-export async function makeCourse(mem: Memory, item: CompItem, fresh = false): Promise<GrammarCourse> {
+export function makeCourse(mem: Memory, item: CompItem, fresh = false): Promise<GrammarCourse> {
   if (!fresh) {
     const hit = cachedCourse(item.id);
-    if (hit) return hit;
+    if (hit) return Promise.resolve(hit);
   }
+  return share(courseKey(item.id) + (fresh ? ':fresh' : ''), () => writeCourse(mem, item, fresh));
+}
+
+async function writeCourse(mem: Memory, item: CompItem, _fresh: boolean): Promise<GrammarCourse> {
   const who = profileId();          // resolved BEFORE the call, not after it
   const P = pack(mem.profile.target);
   const support = nativeName(mem);
@@ -295,7 +376,7 @@ export async function makeCourse(mem: Memory, item: CompItem, fresh = false): Pr
     `You write a five-minute discovery lesson on ONE point of ${P.en} grammar, for one adult learner, in the style of Brilliant.org: the learner works the rule out from examples BEFORE anybody states it. A lesson that opens by naming the rule has failed, however clear the rest of it is.`,
     '',
     'The shape, in this order:',
-    '1. `discover` — 3-4 short examples as EVIDENCE, and a question about what they share. The options describe patterns in plain words, never grammatical jargon the learner has not met yet. It must be answerable from the examples alone by somebody who has never heard the rule.',
+    '1. `discover` — 3-4 short sentences in `examples` as EVIDENCE, and a question about what they share. The options describe patterns in plain words, never grammatical jargon the learner has not met yet. It must be answerable from the examples alone by somebody who has never heard the rule.',
     '2. `choice` — one new case following the same pattern, with the naive guess sitting there as one of the wrong options.',
     '3. `rule` — NOW say it, in at most five short lines. This is the payoff for having worked it out.',
     '4. `gap` — apply it; the learner types the missing piece.',
@@ -306,34 +387,101 @@ export async function makeCourse(mem: Memory, item: CompItem, fresh = false): Pr
     'Rules:',
     '- 7 to 9 steps, in that order. About five minutes at a calm pace.',
     `- Every prompt, option, rule line, recap line and explanation is in ${support}. Every example sentence, gap sentence and answer is in ${P.en}.`,
+    `- Every example carries BOTH halves: \`t\`, the sentence in ${P.en}, and \`gloss\`, what it means in ${support}. A sentence the learner cannot read is not evidence, and an empty \`gloss\` is the commonest way to hand them one.`,
+    '- EVERY `discover` step carries 3-4 `examples`. This is the single most important rule here: the examples ARE the lesson, the question is only what points at them, and a `discover` step with an empty `examples` array is a screen asking about sentences nobody can see. Never write « these sentences » without giving them.',
     '- A `gap` text carries EXACTLY ONE ___ ; `answer` is only what fills it, never the whole sentence.',
+    '- `options` holds 3 SHORT choices, all different, and `correct` is the index of the right one. Empty for any other kind.',
     '- Never name the tense or the rule before the `rule` step reveals it — not in a prompt, not in an option, not in an explanation.',
     '- Every `explain` says WHY in one or two lines. Never "Correct!", never "Well done".',
     '- Examples must be sentences THIS learner could plausibly say, at their band, about the things they talk about. Where their own recorded mistakes are given below, build at least two steps directly on them.',
-    '- At most TWO steps in the whole lesson carry a drawing; everywhere else viz.kind is "none". Pick one only when the picture says what a sentence cannot: `timeline` for anything about time, `table` for a paradigm worth seeing whole, `chunks` for word order, `split` for a two-way contrast.',
-    '',
-    `Then ${BANK_SIZE} micro-exercises on the same point, for later review sittings. One sentence each, answerable in ten seconds, covering the full range of the rule including its traps. Roughly half \`gap\` and half \`choice\`. None of them may reuse a sentence from the lesson.`
+    '- `viz` is a SHORT list, NEVER longer than two, each entry naming the step it belongs to in `step`. Include ONE where the concept has a shape worth seeing — a stretch of time (`timeline`), a paradigm worth seeing whole (`table`), an order things go in (`chunks`), a two-way split (`split`) — and none at all where a drawing would only redraw the sentence under it. Fill only the fields the chosen kind uses; the rest come back empty.'
   ].join('\n');
 
   const content = await chat({
     model: 'gpt-5.4-mini',
     messages: [{ role: 'system', content: sys }, { role: 'user', content: learnerBrief(mem, item) }],
-    response_format: { type: 'json_schema', json_schema: COURSE_SCHEMA },
-    reasoning_effort: 'medium'
+    response_format: { type: 'json_schema', json_schema: LESSON_SCHEMA },
+    // Deliberately 'low', as every other generator in this app uses. The proxy BUFFERS a
+    // non-streamed reply, and a lesson that thinks for a minute before writing a word is a
+    // lesson the edge function is killed in the middle of. See netlify/edge-functions/analyze.
+    reasoning_effort: 'low'
   });
-  const raw = JSON.parse(content) as Omit<GrammarCourse, 'id' | 'madeAt'>;
-  if (!raw.steps?.length) throw new Error('empty course');
+  const raw = parseReply<Lesson>(content, 'lesson');
+  if (!raw.steps?.length) throw new Error('lesson: no steps');
+
+  // The drawings come back as their own short list; put each one back on the step it names.
+  const steps: CourseStep[] = raw.steps.map(st => ({ ...st, viz: noViz() }));
+  for (const v of (raw.viz ?? []).slice(0, 2)) {
+    const st = steps[v.step];
+    if (st && v.kind && v.kind !== 'none') st.viz = { ...noViz(), ...v };
+  }
+
   const course: GrammarCourse = {
     id: item.id,
     title: raw.title || item.label,
     why: raw.why ?? '',
-    steps: raw.steps.filter(usableStep),
-    bank: (raw.bank ?? []).filter(usableDrill).map(d => ({ ...d, topic: item.id })),
+    steps: steps.filter(usableStep),
+    bank: [],
     madeAt: todayISO()
   };
-  if (!course.steps.length) throw new Error('no usable steps');
+  if (!course.steps.length) throw new Error('lesson: nothing usable came back');
+  if (!teachesByExample(course.steps)) throw new Error('lesson: came back with no evidence to reason from');
   cacheCourse(course, who);
+  // The exercises are not needed until the lesson has been sat through, so they are written
+  // after it rather than in the same breath, and the student never waits on them.
+  void ensureBank(mem, item).catch(() => { /* Today warms it again tomorrow */ });
   return course;
+}
+
+/** The shape the lesson call returns: steps without their drawings, and the drawings beside
+ *  them naming the step each belongs to. */
+interface Lesson {
+  title: string;
+  why: string;
+  steps: Omit<CourseStep, 'viz'>[];
+  viz: (GrammarViz & { step: number })[];
+}
+
+const noViz = (): GrammarViz => ({
+  kind: 'none', caption: '', marks: [], cols: [], rows: [], hi: [], slots: [],
+  left: { title: '', items: [] }, right: { title: '', items: [] }
+});
+
+/** Writes the exercise bank for a concept and files it with its lesson. A no-op once the
+ *  bank is there, so the day screen can call it freely. */
+export function ensureBank(mem: Memory, item: CompItem): Promise<GrammarDrill[]> {
+  const have = cachedCourse(item.id);
+  if (have?.bank?.length) return Promise.resolve(have.bank);
+  return share('bank:' + courseKey(item.id), () => writeBank(mem, item));
+}
+
+async function writeBank(mem: Memory, item: CompItem): Promise<GrammarDrill[]> {
+  const who = profileId();
+  const P = pack(mem.profile.target);
+  const support = nativeName(mem);
+  const sys = [
+    `You write ${BANK_SIZE} micro-exercises on ONE point of ${P.en} grammar, for the short review sittings of one adult learner who has just been taught it.`,
+    '',
+    '- One sentence each, answerable in ten seconds, covering the full range of the rule including its traps.',
+    '- Roughly half `gap` (the learner types the missing piece) and half `choice` (three SHORT options, all different, one of them exactly the answer).',
+    '- Every `text` carries EXACTLY ONE ___ ; `answer` is only what fills it, never the whole sentence.',
+    `- \`prompt\` and \`explain\` are in ${support}; every sentence and answer is in ${P.en}.`,
+    '- `explain` says WHY in one short line.',
+    '- Sentences this learner could plausibly say, at their band. Where their own recorded mistakes are given below, build two of the exercises directly on them.'
+  ].join('\n');
+
+  const content = await chat({
+    model: 'gpt-5.4-mini',
+    messages: [{ role: 'system', content: sys }, { role: 'user', content: learnerBrief(mem, item) }],
+    response_format: { type: 'json_schema', json_schema: BANK_SCHEMA },
+    reasoning_effort: 'low'
+  });
+  const raw = parseReply<{ bank: GrammarDrill[] }>(content, 'bank');
+  const bank = (raw.bank ?? []).filter(usableDrill).map(d => ({ ...d, topic: item.id }));
+  if (!bank.length) throw new Error('bank: nothing usable came back');
+  const course = cachedCourse(item.id);
+  if (course) cacheCourse({ ...course, bank }, who);
+  return bank;
 }
 
 /** A step the player can actually render. A gap with no gap, or a choice whose correct
@@ -349,11 +497,22 @@ const distinct = (options: string[]): boolean =>
 function usableStep(s: GrammarCourse['steps'][number]): boolean {
   if (s.kind === 'gap') return oneGap(s.text) && !!s.answer.trim();
   if (s.kind === 'discover' || s.kind === 'choice') {
-    return s.options.length >= 2 && s.options.length <= MAX_OPTIONS
+    const askable = s.options.length >= 2 && s.options.length <= MAX_OPTIONS
       && distinct(s.options) && s.correct >= 0 && s.correct < s.options.length;
+    // A discovery step is its evidence. Without the sentences, the question — « what do
+    // these sentences have in common? » — is pointing at an empty space, and no learner can
+    // answer it however good the options are.
+    if (s.kind === 'discover') return askable && s.examples.length >= 2;
+    return askable && (s.examples.length > 0 || oneGap(s.text) || !!s.prompt.trim());
   }
   return s.lines.length > 0 || !!s.prompt.trim();
 }
+
+/** Did a lesson come back as a discovery lesson at all? One with no evidence anywhere is
+ *  the model having written a textbook page: worth throwing away and asking again, because
+ *  the examples-first order is the whole of what this feature is for. */
+const teachesByExample = (steps: GrammarCourse['steps']): boolean =>
+  steps.some(s => s.kind === 'discover') && steps.some(s => s.examples.length >= 2);
 
 function usableDrill(d: GrammarDrill): boolean {
   if (!oneGap(d.text) || !d.answer.trim()) return false;
@@ -385,11 +544,15 @@ export function cachedGuide(id: string): GrammarGuide | null {
 /** Writes the detailed fiche. As many pages as the concept needs — one for a rule like the
  *  futur proche, four or five for the passé composé, which is three rules and an agreement
  *  wearing a single name. */
-export async function makeGuide(mem: Memory, item: CompItem, fresh = false): Promise<GrammarGuide> {
+export function makeGuide(mem: Memory, item: CompItem, fresh = false): Promise<GrammarGuide> {
   if (!fresh) {
     const hit = cachedGuide(item.id);
-    if (hit) return hit;
+    if (hit) return Promise.resolve(hit);
   }
+  return share(guideKey(item.id) + (fresh ? ':fresh' : ''), () => writeGuide(mem, item));
+}
+
+async function writeGuide(mem: Memory, item: CompItem): Promise<GrammarGuide> {
   const who = profileId();          // resolved BEFORE the call, not after it
   const P = pack(mem.profile.target);
   const support = nativeName(mem);
@@ -401,26 +564,53 @@ export async function makeGuide(mem: Memory, item: CompItem, fresh = false): Pro
     `- Lines, titles, glosses and traps are in ${support}; every example sentence is in ${P.en}.`,
     '- Lines are reference, not prose: forms, endings, the order things go in, the one-line conditions. A line a learner cannot use while mid-sentence does not belong.',
     `- The traps are the mistakes a ${support} speaker actually makes here, not a general list. Where this learner's own recorded mistakes are given below, one page must address them by name.`,
-    '- At most one drawing PER PAGE, and only where it earns its place: `timeline` for time, `table` for a paradigm, `chunks` for word order, `split` for a contrast. Otherwise viz.kind is "none". A conjugation table is almost always worth drawing.'
+    '- `viz` is a short list beside the pages, each entry naming its page in `step`: at most one drawing per page, and only where it earns its place. `timeline` for time, `table` for a paradigm, `chunks` for word order, `split` for a contrast. A conjugation table is almost always worth drawing; everything else usually is not.'
   ].join('\n');
 
   const content = await chat({
     model: 'gpt-5.4-mini',
     messages: [{ role: 'system', content: sys }, { role: 'user', content: learnerBrief(mem, item) }],
     response_format: { type: 'json_schema', json_schema: GUIDE_SCHEMA },
-    reasoning_effort: 'medium'
+    reasoning_effort: 'low'
   });
-  const raw = JSON.parse(content) as Omit<GrammarGuide, 'id' | 'madeAt'>;
-  if (!raw.pages?.length) throw new Error('empty guide');
+  const raw = parseReply<{ title: string; pages: Omit<GrammarGuide['pages'][number], 'viz'>[]; viz: (GrammarViz & { step: number })[] }>(content, 'fiche');
+  if (!raw.pages?.length) throw new Error('fiche: no pages');
+  const pages = raw.pages.map(pg => ({ ...pg, viz: noViz() }));
+  for (const v of raw.viz ?? []) {
+    const pg = pages[v.step];
+    if (pg && v.kind && v.kind !== 'none') pg.viz = { ...noViz(), ...v };
+  }
   const guide: GrammarGuide = {
     id: item.id,
     title: raw.title || item.label,
-    pages: raw.pages.filter(p => p.lines.length || p.examples.length),
+    pages: pages.filter(pg => pg.lines.length || pg.examples.length),
     madeAt: todayISO()
   };
-  if (!guide.pages.length) throw new Error('no usable pages');
+  if (!guide.pages.length) throw new Error('fiche: nothing usable came back');
   try { localStorage.setItem(guideKey(item.id, who), JSON.stringify(guide)); } catch { /* cache only */ }
   return guide;
+}
+
+/** Writes, in the background, whatever the grammar button would open if it were tapped now.
+ *
+ *  A lesson takes several seconds to write, and a button that spends them spinning has
+ *  already eaten part of the five minutes it promises. The day screen knows which concept
+ *  the button means the moment it renders, so the lesson is written then — and because
+ *  makeCourse shares its call, a student who taps mid-write joins that call instead of
+ *  starting a second one.
+ *
+ *  Never throws, and rests for ten minutes after a failure so a flat network is not asked
+ *  the same expensive question on every visit to the day screen. */
+export async function warm(mem: Memory, item: CompItem, want: 'course' | 'bank' | 'guide'): Promise<void> {
+  const key = (want === 'guide' ? guideKey(item.id) : courseKey(item.id)) + ':warm:' + want;
+  if (resting(key)) return;
+  try {
+    if (want === 'guide') await makeGuide(mem, item);
+    else if (want === 'bank') await ensureBank(mem, item);
+    else await makeCourse(mem, item);
+  } catch {
+    failedAt.set(key, Date.now());
+  }
 }
 
 /** Drops the cached fiche so the next open writes a new one.
