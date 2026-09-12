@@ -51,6 +51,8 @@ export function DrillCard({ drill, lang, onDone }: {
             : <span key={k}>{p}</span>)}
         </div>
 
+        {drill.cue && <div class="gr-cue">{S.rev.hint} {drill.cue}</div>}
+
         {choice ? (
           <div class="gr-opts" style="width:100%;max-width:420px">
             {drill.options.slice(0, MAX_OPTIONS).map((o, k) => {

@@ -800,3 +800,10 @@ textarea.json,.json{max-width:100%}
 .gramblock .gt{font-family:var(--disp);font-weight:800;font-size:clamp(20px,5.2vw,24px);
   line-height:1.15;letter-spacing:-.02em;text-wrap:pretty}
 .gramblock .lvl{background:var(--cream);color:var(--tomato-deep);flex-shrink:0}
+/* The cue that makes a blank answerable: what is being replaced, which form is wanted.
+   Quiet, above the box, and never containing the answer (scrubbed through lib/hints). */
+.gr-cue{font-size:13px;font-weight:600;color:var(--ink2);line-height:1.45;text-wrap:pretty}
+.rev-card.drill .gr-cue{color:var(--blue-deep)}
+/* A row the student has placed by hand, and the reach of that placement. */
+.gsetrow.held{box-shadow:inset 3px 0 0 var(--tomato);padding-left:9px}
+.gsetheld{margin-left:8px;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tomato)}

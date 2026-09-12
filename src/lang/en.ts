@@ -354,7 +354,7 @@ const ui: UIStrings = {
     /* the block on the day screen */
     title: 'Grammar', kicker: 'Grammar of the day',
     start: 'Take the course', minutes: '5 min',
-    sheet: 'The sheet', redo: 'Redo the course',
+    sheet: 'The sheet', redo: 'A new course',
     nothing: 'Nothing to work on right now.',
     nothingSub: 'Your competency map is up to date. Come back after the next call.',
     since: (ok: number, tries: number) => `${ok}/${tries} right since the course`,
@@ -373,6 +373,8 @@ const ui: UIStrings = {
     finished: 'Course finished',
     finishedSub: 'These exercises come back through your reviews until it sticks.',
     /* the fiche */
+    replay: 'Go through it again',
+    replayedSub: 'Nothing new recorded — you have only read it again.',
     pageOf: (i: number, n: number) => `${i} / ${n}`,
     prev: 'Previous', traps: 'Traps',
     makingSheet: 'Odile is writing the sheet…',
@@ -381,6 +383,9 @@ const ui: UIStrings = {
     extra: (n: number) => ` + ${n} grammar`,
     drill: 'Grammar',
     /* settings */
+    orderHeld: 'your order',
+    orderReset: 'Back to the automatic order',
+    orderNote: (n: number) => `You are holding the first ${n}. Below them a gap a call turns up can still climb.`,
     frOnlyNote: 'Grammar courses exist only for French for now.',
     queueIntro: 'What she will teach you next, in order. Gaps at your level and below come first — move up what is pressing, set aside what is not.',
     share: 'Exercises in reviews', shareOff: 'None',

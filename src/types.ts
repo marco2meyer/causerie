@@ -116,6 +116,12 @@ export interface CourseStep {
   answer: string;
   /** rule/recap: the rule in at most five short lines. */
   lines: string[];
+  /** What the blank is FOR, in the support language — the thing that makes the answer
+   *  findable at all. « Je ___ connais » has four defensible answers until something says
+   *  which noun is being replaced. The deck has carried exactly this for its cloze cards
+   *  since it began (Correction.hint, lib/hints): it points AT the gap from outside it, and
+   *  it must never contain the answer. Empty where the sentence settles the answer alone. */
+  cue: string;
   /** Shown once the step is answered, or straight away on a rule screen. */
   explain: string;
 }
@@ -129,6 +135,9 @@ export interface GrammarDrill {
   prompt: string;
   /** The sentence, carrying exactly one ___. */
   text: string;
+  /** What the blank is for: the same cue a course step carries, and for the same reason —
+   *  mid-sitting there is even less context than in a lesson. Never contains the answer. */
+  cue: string;
   /** choice: three short options. Empty for a typed gap. */
   options: string[];
   answer: string;

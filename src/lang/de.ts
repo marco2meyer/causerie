@@ -357,7 +357,7 @@ export const deUi: UIStrings = {
     /* the block on the day screen */
     title: 'Grammatik', kicker: 'Grammatik des Tages',
     start: 'Kurs machen', minutes: '5 Min',
-    sheet: 'Das Merkblatt', redo: 'Kurs wiederholen',
+    sheet: 'Das Merkblatt', redo: 'Ein neuer Kurs',
     nothing: 'Gerade nichts zu üben.',
     nothingSub: 'Deine Kompetenzkarte ist aktuell. Schau nach dem nächsten Gespräch wieder vorbei.',
     since: (ok: number, tries: number) => `${ok}/${tries} richtig seit dem Kurs`,
@@ -376,6 +376,8 @@ export const deUi: UIStrings = {
     finished: 'Kurs beendet',
     finishedSub: 'Diese Übungen tauchen in deinen Wiederholungen wieder auf, bis es sitzt.',
     /* the fiche */
+    replay: 'Kurs noch einmal ansehen',
+    replayedSub: 'Nichts Neues vermerkt — du hast ihn nur noch einmal gelesen.',
     pageOf: (i: number, n: number) => `${i} / ${n}`,
     prev: 'Zurück', traps: 'Fallen',
     makingSheet: 'Odile schreibt das Merkblatt…',
@@ -384,6 +386,9 @@ export const deUi: UIStrings = {
     extra: (n: number) => ` + ${n} Grammatik`,
     drill: 'Grammatik',
     /* settings */
+    orderHeld: 'deine Reihenfolge',
+    orderReset: 'Zurück zur automatischen Reihenfolge',
+    orderNote: (n: number) => `Die ersten ${n} hältst du fest. Darunter kann eine Lücke, die ein Gespräch aufdeckt, noch aufsteigen.`,
     frOnlyNote: 'Grammatikkurse gibt es vorerst nur für Französisch.',
     queueIntro: 'Was sie dir als Nächstes beibringt, der Reihe nach. Lücken auf deinem Niveau und darunter zuerst — schieb nach oben, was drängt, und leg beiseite, was nicht ansteht.',
     share: 'Übungen in den Wiederholungen', shareOff: 'Keine',

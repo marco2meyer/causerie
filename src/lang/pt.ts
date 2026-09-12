@@ -354,7 +354,7 @@ const ui: UIStrings = {
     /* the block on the day screen */
     title: 'Gramática', kicker: 'Gramática do dia',
     start: 'Fazer o curso', minutes: '5 min',
-    sheet: 'A ficha', redo: 'Refazer o curso',
+    sheet: 'A ficha', redo: 'Um curso novo',
     nothing: 'Nada para trabalhar por agora.',
     nothingSub: 'O teu mapa de competências está em dia. Volta depois da próxima chamada.',
     since: (ok: number, tries: number) => `${ok}/${tries} certas desde o curso`,
@@ -373,6 +373,8 @@ const ui: UIStrings = {
     finished: 'Curso terminado',
     finishedSub: 'Estes exercícios voltam nas tuas revisões até assentar.',
     /* the fiche */
+    replay: 'Rever o curso',
+    replayedSub: 'Nada de novo registado: só o voltaste a ler.',
     pageOf: (i: number, n: number) => `${i} / ${n}`,
     prev: 'Anterior', traps: 'Armadilhas',
     makingSheet: 'A Odile escreve a ficha…',
@@ -381,6 +383,9 @@ const ui: UIStrings = {
     extra: (n: number) => ` + ${n} gramática`,
     drill: 'Gramática',
     /* settings */
+    orderHeld: 'a tua ordem',
+    orderReset: 'Voltar à ordem automática',
+    orderNote: (n: number) => `Manténs os primeiros ${n}. Abaixo, uma lacuna que uma chamada revele ainda pode subir.`,
     frOnlyNote: 'Por agora, os cursos de gramática só existem em francês.',
     queueIntro: 'O que te vai ensinar a seguir, por ordem. Primeiro as lacunas do teu nível e abaixo — sobe o que urge, põe de parte o que não se aplica.',
     share: 'Exercícios nas revisões', shareOff: 'Nenhum',

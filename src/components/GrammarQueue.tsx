@@ -22,6 +22,11 @@ export function GrammarQueue({ mem, update }: { mem: Memory; update: (fn: (m: Me
   // whole map, which is what the arrows are disabled against.
   const queueAll = grammarQueue(mem);
   const queue = queueAll.slice(0, 8);
+  // How far the student's own order reaches. Worth showing, because it is further than a
+  // single nudge looks: moving one row up pins everything above it too — that is how « this
+  // one before that one » has to be expressed — and until it is cleared, a gap a later call
+  // turns up can rise no higher than the row beneath the pins.
+  const held = new Set(grammarOf(mem).order);
   const learning = learningTopics(mem);
   const mastered = Object.entries(g.topics)
     .filter(([, t]) => t.masteredAt || t.manual)
@@ -100,7 +105,7 @@ export function GrammarQueue({ mem, update }: { mem: Memory; update: (fn: (m: Me
                 own, not the list's, so the arrows are disabled exactly when they would do
                 nothing rather than one row out. */}
             {queue.map((item, i) => (
-              <div key={item.id} class="gsetrow">
+              <div key={item.id} class={'gsetrow' + (held.has(item.id) ? ' held' : '')}>
                 <span class="lvl">{item.band}</span>
                 <span class="gsetlab" lang={mem.profile.target}>{item.label}</span>
                 <div class="gsetacts">
@@ -115,6 +120,14 @@ export function GrammarQueue({ mem, update }: { mem: Memory; update: (fn: (m: Me
             ))}
           </div>
         )}
+
+      {held.size > 0 && (
+        <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+          <div class="tiny" style="flex:1 1 200px;line-height:1.5">{S.gram.orderNote(held.size)}</div>
+          <button class="btn subtle" style="padding:7px 12px;font-size:12px"
+            onClick={() => update(m => { grammarState(m).order = []; })}>{S.gram.orderReset}</button>
+        </div>
+      )}
 
       {mastered.length > 0 && (
         <div>

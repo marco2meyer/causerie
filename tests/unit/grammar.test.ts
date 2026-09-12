@@ -6,6 +6,7 @@ import {
   grammarState, interleave, isDrillId, isMastered, learningTopics, markCourseDone, MASTERY,
   pickDrills, recentAccuracy, recordDrill, settleMastery
 } from '../../src/lib/grammar';
+import { usableDrill, usableStep } from '../../src/lib/course';
 
 /** A memory at B1 (index 4), which is what puts A1/A2/B1 grammar in range. */
 const at = (level: number): Memory => {
@@ -20,7 +21,8 @@ const topic = (over: Partial<GrammarTopic> = {}): GrammarTopic =>
 const days = (spec: [string, number, number][]) => spec.map(([d, ok, ko]) => ({ d, ok, ko }));
 
 const drill = (topicId: string, n: number): GrammarDrill => ({
-  topic: topicId, kind: 'gap', prompt: 'p' + n, text: '___ ' + n, options: [], answer: 'a' + n, explain: 'e'
+  topic: topicId, kind: 'gap', prompt: 'p' + n, text: '___ ' + n, cue: 'c' + n,
+  options: [], answer: 'a' + n, explain: 'e'
 });
 
 describe('grammarQueue', () => {
@@ -502,5 +504,119 @@ describe('drill ids', () => {
     expect(isDrillId('c4k9x2a')).toBe(false);
     expect(drillIndex('c4k9x2a')).toBe(-1);
     expect(drillIndex('gx:nope')).toBe(-1);
+  });
+});
+
+/* The queue is recomputed from scratch on every render — it is a reading of the competency
+ * matrix, not a stored list. These are the things that must survive that recomputation. */
+describe('what a recompute must not disturb', () => {
+  /** What Mémoire's reorder arrows do. */
+  const move = (m: Memory, id: string, by: number) => {
+    const ranked = grammarQueue(m).map(c => c.id);
+    const i = ranked.indexOf(id);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= ranked.length) return;
+    [ranked[i], ranked[j]] = [ranked[j], ranked[i]];
+    grammarState(m).order = ranked.slice(0, Math.max(i, j) + 1);
+  };
+
+  it('a mastered concept never returns to the queue, whatever the matrix then says', () => {
+    const m = at(4);
+    markCourseDone(m, 'g-a2-partitif', '2026-01-01');
+    grammarState(m).topics['g-a2-partitif'].masteredAt = '2026-01-05';
+    // The worst thing the matrix could do: a later call says the cell is failing again.
+    m.comp = { 'g-a2-partitif': { status: 'ko', lastSeen: '2026-03-01' } };
+    expect(grammarQueue(m).map(c => c.id)).not.toContain('g-a2-partitif');
+    expect(grammarFocus(m)?.item.id).not.toBe('g-a2-partitif');
+    expect(learningTopics(m)).not.toContain('g-a2-partitif');
+    // And it is still there in the finished list, with the day it was finished.
+    expect(grammarState(m).topics['g-a2-partitif'].masteredAt).toBe('2026-01-05');
+  });
+
+  it('the student order survives the matrix changing underneath it', () => {
+    const m = at(4);
+    const before = grammarQueue(m).map(c => c.id);
+    move(m, before[3], -1);                                   // pull the fourth up one
+    const pinned = grammarQueue(m).map(c => c.id).slice(0, 4);
+    // A call now reports the LAST concept in the library as failing outright.
+    m.comp = { [before[before.length - 1]]: { status: 'ko', lastSeen: '2026-03-01' } };
+    const after = grammarQueue(m).map(c => c.id);
+    expect(after.slice(0, 4)).toEqual(pinned);                // the student's order held
+    expect(after[4]).toBe(before[before.length - 1]);         // the new gap rose beneath it
+  });
+
+  it('teaching the head of the queue leaves the rest of the order alone', () => {
+    const m = at(4);
+    const before = grammarQueue(m).map(c => c.id);
+    move(m, before[3], -1);
+    const pinned = grammarQueue(m).map(c => c.id).slice(0, 4);
+    markCourseDone(m, pinned[0], '2026-02-01');               // the student takes the lesson
+    expect(grammarQueue(m).map(c => c.id).slice(0, 3)).toEqual(pinned.slice(1));
+    expect(grammarState(m).order).not.toContain(pinned[0]);   // and it is off the order list
+  });
+
+  it('marking done by hand, and skipping, take the concept out of the order too', () => {
+    const m = at(4);
+    const before = grammarQueue(m).map(c => c.id);
+    move(m, before[3], -1);
+    const st = grammarState(m);
+    st.topics[before[0]] = { courseAt: '', days: [], masteredAt: '2026-02-01', manual: 1 };
+    st.order = st.order.filter(x => x !== before[0]);
+    st.skipped = [before[1]];
+    st.order = st.order.filter(x => x !== before[1]);
+    const after = grammarQueue(m).map(c => c.id);
+    expect(after).not.toContain(before[0]);
+    expect(after).not.toContain(before[1]);
+    expect(st.order.every(id => after.includes(id))).toBe(true);   // no ghosts left behind
+  });
+
+  it('a level drop parks a pinned concept rather than losing where it was', () => {
+    const m = at(4);                                          // B1
+    const b1 = grammarQueue(m).find(c => c.band === 'B1')!;
+    move(m, b1.id, -1);
+    expect(grammarState(m).order).toContain(b1.id);
+    m.cefr.overall = 2;                                       // back to A2 after a bad week
+    expect(grammarQueue(m).map(c => c.id)).not.toContain(b1.id);
+    m.cefr.overall = 4;                                       // and back up again
+    expect(grammarQueue(m).map(c => c.id)).toContain(b1.id);
+  });
+});
+
+/* A blank has to be answerable from what is on the screen. « Je ___ connais » has four
+ * defensible answers until something says whose neighbour is meant — so a short answer,
+ * which is to say a function word, has to arrive with the cue that pins it down. */
+describe('an exercise the learner can actually answer', () => {
+  const gap = (over: Partial<GrammarDrill> = {}): GrammarDrill => ({
+    topic: 'g-a2-cod-coi', kind: 'gap', prompt: 'Setze ein.',
+    text: 'Je ___ connais.', cue: 'ersetzt « ma voisine »', options: [], answer: 'la', explain: 'e', ...over
+  });
+
+  it('keeps a short answer that says what it is replacing', () => {
+    expect(usableDrill(gap())).toBe(true);
+  });
+
+  it('drops a short answer with nothing to go on', () => {
+    expect(usableDrill(gap({ cue: '' }))).toBe(false);
+    expect(usableDrill(gap({ cue: '   ' }))).toBe(false);
+  });
+
+  it('asks nothing extra of an answer its own sentence pins down', () => {
+    // A content word is findable from the sentence; a pronoun is not.
+    expect(usableDrill(gap({ text: 'Hier, j’ai ___ au parc.', answer: 'marché', cue: '' }))).toBe(true);
+  });
+
+  it('leaves multiple choice alone — its answer is on the screen among the options', () => {
+    expect(usableDrill(gap({ kind: 'choice', cue: '', options: ['la', 'le', 'lui'] }))).toBe(true);
+  });
+
+  it('holds a lesson step to the same rule', () => {
+    const step = (over: Record<string, unknown> = {}) => ({
+      kind: 'gap' as const, prompt: 'p', examples: [], viz: {} as never, options: [], correct: 0,
+      text: 'Je ___ connais.', cue: 'ersetzt « ma voisine »', answer: 'la', lines: [], explain: 'e', ...over
+    });
+    expect(usableStep(step())).toBe(true);
+    expect(usableStep(step({ cue: '' }))).toBe(false);
+    // …unless the sentences above it already supply the context.
+    expect(usableStep(step({ cue: '', examples: [{ t: 'Je connais ma voisine.', gloss: 'x' }] }))).toBe(true);
   });
 });

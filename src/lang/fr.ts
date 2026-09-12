@@ -357,7 +357,7 @@ const ui = {
     /* the block on the day screen */
     title: 'Grammaire', kicker: 'Grammaire du jour',
     start: 'Faire le cours', minutes: '5 min',
-    sheet: 'La fiche', redo: 'Refaire le cours',
+    sheet: 'La fiche', redo: 'Un nouveau cours',
     nothing: 'Rien à travailler pour l’instant.',
     nothingSub: 'Ta carte des compétences est à jour. Reviens après le prochain appel.',
     since: (ok: number, tries: number) => `${ok}/${tries} justes depuis le cours`,
@@ -376,6 +376,8 @@ const ui = {
     finished: 'Cours terminé',
     finishedSub: 'Ces exercices reviendront au fil de tes révisions, jusqu’à ce que ça tienne.',
     /* the fiche */
+    replay: 'Revoir le cours',
+    replayedSub: 'Rien de nouveau enregistré : tu viens de le relire.',
     pageOf: (i: number, n: number) => `${i} / ${n}`,
     prev: 'Précédent', traps: 'Pièges',
     makingSheet: 'Odile écrit la fiche…',
@@ -384,6 +386,9 @@ const ui = {
     extra: (n: number) => ` + ${n} grammaire`,
     drill: 'Grammaire',
     /* settings */
+    orderHeld: 'ton ordre',
+    orderReset: 'Revenir à l’ordre automatique',
+    orderNote: (n: number) => `Tu tiens les ${n} premiers. En dessous, une lacune découverte par un appel peut encore remonter.`,
     frOnlyNote: 'Les cours de grammaire n’existent qu’en français pour l’instant.',
     queueIntro: 'Ce qu’elle t’apprendra ensuite, dans l’ordre. Les lacunes de ton niveau et en dessous d’abord — monte ce qui presse, écarte ce qui n’a pas lieu d’être.',
     share: 'Exercices dans les révisions', shareOff: 'Aucun',

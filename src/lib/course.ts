@@ -5,6 +5,7 @@ import type { CompItem } from './competencies';
 import { SHEET_BY_ID } from './sheets';
 import { activeProfile } from './profiles';
 import { checkAnswer } from './grammar';
+import { scrubHint } from './hints';
 import { norm, todayISO } from './utils';
 
 /** Writing the grammar lessons.
@@ -27,7 +28,7 @@ import { norm, todayISO } from './utils';
 
 /** Bump when the schema or the teaching shape changes, so stale courses are regenerated
  *  rather than rendered by a player that no longer understands them. */
-const COURSE_REV = 1;
+const COURSE_REV = 2;   // v2: every gap carries the cue that makes it answerable
 
 /** Exercises asked for per course. Two evenings' worth at the shipped share, so the bank
  *  outlives the few days a concept normally takes to master. */
@@ -151,11 +152,13 @@ const DRILL = {
     kind: { type: 'string', enum: ['gap', 'choice'] },
     prompt: S('short support-language cue saying what to produce'),
     text: S('one target-language sentence carrying exactly one ___'),
+    cue: S('what the blank is FOR, in the support language, WITHOUT containing the answer: which word is being replaced (« ta voisine »), which form is wanted (« le participe de prendre »), which person. Say it whenever the sentence alone leaves more than one defensible answer — which, for a pronoun or an auxiliary, is nearly always. Empty string only when the sentence really does settle it.'),
+
     options: ARR(S(), 'choice: exactly three short options, one right. Empty array for a gap.'),
     answer: S('what fills the gap — that alone, never the whole sentence'),
     explain: S('one short support-language line saying WHY')
   },
-  required: ['kind', 'prompt', 'text', 'options', 'answer', 'explain']
+  required: ['kind', 'prompt', 'text', 'cue', 'options', 'answer', 'explain']
 };
 
 /** The diagrams, lifted OUT of the steps they belong to.
@@ -189,11 +192,13 @@ export const LESSON_SCHEMA = {
           options: ARR(S(), 'discover/choice: 3-4 short options, exactly one right. Empty otherwise.'),
           correct: { type: 'integer', description: '0-based index of the right option; 0 when there are none' },
           text: S('gap: the sentence with exactly one ___. Empty otherwise.'),
+          cue: S('what the blank is FOR, in the support language, WITHOUT containing the answer: which word is being replaced (« ta voisine »), which form is wanted (« le participe de prendre »), which person. Say it whenever the sentence alone leaves more than one defensible answer — which, for a pronoun or an auxiliary, is nearly always. Empty string only when the sentence really does settle it.'),
+
           answer: S('gap: what fills it. Empty otherwise.'),
           lines: ARR(S(), 'rule/recap: at most five short lines. Empty otherwise.'),
           explain: S('shown once answered, or straight away on a rule screen: WHY, in 1-2 lines')
         },
-        required: ['kind', 'prompt', 'examples', 'options', 'correct', 'text', 'answer', 'lines', 'explain']
+        required: ['kind', 'prompt', 'examples', 'options', 'correct', 'text', 'cue', 'answer', 'lines', 'explain']
       }),
       viz: ARR(VIZ_AT, 'AT MOST TWO drawings for the whole lesson, each naming its step. Empty when none earns its place.')
     },
@@ -390,6 +395,7 @@ async function writeCourse(mem: Memory, item: CompItem, _fresh: boolean): Promis
     `- Every example carries BOTH halves: \`t\`, the sentence in ${P.en}, and \`gloss\`, what it means in ${support}. A sentence the learner cannot read is not evidence, and an empty \`gloss\` is the commonest way to hand them one.`,
     '- EVERY `discover` step carries 3-4 `examples`. This is the single most important rule here: the examples ARE the lesson, the question is only what points at them, and a `discover` step with an empty `examples` array is a screen asking about sentences nobody can see. Never write « these sentences » without giving them.',
     '- A `gap` text carries EXACTLY ONE ___ ; `answer` is only what fills it, never the whole sentence.',
+    '- An exercise must be ANSWERABLE from what is on the screen. « Je ___ connais » has four defensible answers until something says whose neighbour is meant; « Je ___ ai vus » has several until something says what was seen. Put that in `cue` — the noun being replaced, the form wanted, the person — never in a way that contains the answer itself. An exercise the learner can only guess at teaches them that the app is arbitrary.',
     '- `options` holds 3 SHORT choices, all different, and `correct` is the index of the right one. Empty for any other kind.',
     '- Never name the tense or the rule before the `rule` step reveals it — not in a prompt, not in an option, not in an explanation.',
     '- Every `explain` says WHY in one or two lines. Never "Correct!", never "Well done".',
@@ -410,7 +416,12 @@ async function writeCourse(mem: Memory, item: CompItem, _fresh: boolean): Promis
   if (!raw.steps?.length) throw new Error('lesson: no steps');
 
   // The drawings come back as their own short list; put each one back on the step it names.
-  const steps: CourseStep[] = raw.steps.map(st => ({ ...st, viz: noViz() }));
+  const steps: CourseStep[] = raw.steps.map(st => ({
+    ...st, viz: noViz(),
+    // Held to the same standard the deck holds its cloze hints to: a cue that names the
+    // answer is worse than none, because it turns a question into a reading exercise.
+    cue: st.kind === 'gap' || st.kind === 'choice' ? (scrubHint(st.cue, st.answer) ?? '') : ''
+  }));
   for (const v of (raw.viz ?? []).slice(0, 2)) {
     const st = steps[v.step];
     if (st && v.kind && v.kind !== 'none') st.viz = { ...noViz(), ...v };
@@ -465,6 +476,7 @@ async function writeBank(mem: Memory, item: CompItem): Promise<GrammarDrill[]> {
     '- One sentence each, answerable in ten seconds, covering the full range of the rule including its traps.',
     '- Roughly half `gap` (the learner types the missing piece) and half `choice` (three SHORT options, all different, one of them exactly the answer).',
     '- Every `text` carries EXACTLY ONE ___ ; `answer` is only what fills it, never the whole sentence.',
+    '- An exercise must be ANSWERABLE from what is on the screen. « Je ___ connais » has four defensible answers until something says whose neighbour is meant; « Je ___ ai vus » has several until something says what was seen. Put that in `cue` — the noun being replaced, the form wanted, the person — never in a way that contains the answer itself. An exercise the learner can only guess at teaches them that the app is arbitrary.',
     `- \`prompt\` and \`explain\` are in ${support}; every sentence and answer is in ${P.en}.`,
     '- `explain` says WHY in one short line.',
     '- Sentences this learner could plausibly say, at their band. Where their own recorded mistakes are given below, build two of the exercises directly on them.'
@@ -477,7 +489,9 @@ async function writeBank(mem: Memory, item: CompItem): Promise<GrammarDrill[]> {
     reasoning_effort: 'low'
   });
   const raw = parseReply<{ bank: GrammarDrill[] }>(content, 'bank');
-  const bank = (raw.bank ?? []).filter(usableDrill).map(d => ({ ...d, topic: item.id }));
+  const bank = (raw.bank ?? [])
+    .map(d => ({ ...d, topic: item.id, cue: scrubHint(d.cue, d.answer) ?? '' }))
+    .filter(usableDrill);
   if (!bank.length) throw new Error('bank: nothing usable came back');
   const course = cachedCourse(item.id);
   if (course) cacheCourse({ ...course, bank }, who);
@@ -486,6 +500,13 @@ async function writeBank(mem: Memory, item: CompItem): Promise<GrammarDrill[]> {
 
 /** A step the player can actually render. A gap with no gap, or a choice whose correct
  *  index points past its options, would otherwise reach the learner as a dead screen. */
+/** A short answer is a function word — a pronoun, an article, an auxiliary — and those are
+ *  exactly the blanks a sentence cannot settle on its own: « Je ___ connais » is answerable
+ *  four ways until something says whose neighbour, « Je ___ ai vus » several until something
+ *  says what was seen. Long answers are content words, which their own sentence usually
+ *  pins down. So the cue is required precisely where it was missing. */
+const needsCue = (answer: string): boolean => answer.trim().length <= 5;
+
 /** Gaps in this app are runs of two or more underscores (the deck's cloze convention), and
  *  a step or exercise carries exactly one: there is a single `answer` to fill it with, so a
  *  second blank would be unanswerable and unmarkable. */
@@ -494,8 +515,11 @@ const oneGap = (text: string): boolean => (text.match(/_{2,}/g) ?? []).length ==
 const distinct = (options: string[]): boolean =>
   new Set(options.map(o => norm(o))).size === options.length;
 
-function usableStep(s: GrammarCourse['steps'][number]): boolean {
-  if (s.kind === 'gap') return oneGap(s.text) && !!s.answer.trim();
+export function usableStep(s: GrammarCourse['steps'][number]): boolean {
+  if (s.kind === 'gap') {
+    return oneGap(s.text) && !!s.answer.trim()
+      && (!needsCue(s.answer) || !!s.cue.trim() || s.examples.length > 0);
+  }
   if (s.kind === 'discover' || s.kind === 'choice') {
     const askable = s.options.length >= 2 && s.options.length <= MAX_OPTIONS
       && distinct(s.options) && s.correct >= 0 && s.correct < s.options.length;
@@ -514,8 +538,11 @@ function usableStep(s: GrammarCourse['steps'][number]): boolean {
 const teachesByExample = (steps: GrammarCourse['steps']): boolean =>
   steps.some(s => s.kind === 'discover') && steps.some(s => s.examples.length >= 2);
 
-function usableDrill(d: GrammarDrill): boolean {
+export function usableDrill(d: GrammarDrill): boolean {
   if (!oneGap(d.text) || !d.answer.trim()) return false;
+  // A choice exercise shows its options, so the answer is findable among them; a typed one
+  // shows nothing, and without a cue it is a guess.
+  if (d.kind === 'gap' && needsCue(d.answer) && !d.cue.trim()) return false;
   if (d.kind === 'choice') {
     // A choice whose answer is not among its options cannot be got right — and the test has
     // to be the SAME accent-sensitive one the player grades with. Comparing through

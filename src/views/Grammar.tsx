@@ -45,7 +45,8 @@ export function Grammar({ mem, setMem, onExit, toast }: Props) {
   // Taught already = the fiche is what this button means now. Decided once at mount so
   // finishing the lesson does not swap the screen out from under the last tap.
   const taught = useMemo(() => !!focus?.topic, []);
-  const [mode, setMode] = useState<'course' | 'sheet' | 'redo'>(taught ? 'sheet' : 'course');
+  // 'course' first time · 'replay' the same lesson again · 'renew' a freshly written one.
+  const [mode, setMode] = useState<'course' | 'sheet' | 'replay' | 'renew'>(taught ? 'sheet' : 'course');
 
   if (!item) {
     return (
@@ -64,24 +65,28 @@ export function Grammar({ mem, setMem, onExit, toast }: Props) {
   }
 
   return mode === 'sheet'
-    ? <Fiche mem={mem} item={item} toast={toast} onExit={onExit} onRedo={() => setMode('redo')} />
-    // A redo asks for a NEW lesson, not the transcript of the one already sat through — but
-    // the cached one is deleted only once its replacement has landed. It is the only home of
-    // the concept's exercise bank, and an abandoned redo must not leave tonight's sitting
-    // with nothing to ask.
+    ? <Fiche mem={mem} item={item} toast={toast} onExit={onExit}
+        onReplay={() => setMode('replay')} onRenew={() => setMode('renew')} />
+    // A NEW lesson is written only for 'renew', and the cached one is dropped only once its
+    // replacement has landed: it is the only home of the concept's exercise bank, and an
+    // abandoned renewal must not leave tonight's sitting with nothing to ask. A replay is
+    // the lesson already there, word for word, and costs nothing at all.
     : <Course mem={mem} setMem={setMem} item={item} toast={toast} onExit={onExit}
-        fresh={mode === 'redo'} onDone={() => setMode('sheet')} />;
+        fresh={mode === 'renew'} replay={mode === 'replay'} onDone={() => setMode('sheet')} />;
 }
 
 /* ---------------------------------------------------------------- the lesson */
 
 type Phase = 'asking' | 'answered';
 
-function Course({ mem, setMem, item, toast, onExit, onDone, fresh }: {
+function Course({ mem, setMem, item, toast, onExit, onDone, fresh, replay }: {
   mem: Memory; setMem: (m: Memory) => void; item: CompItem;
   toast: (m: string, e?: boolean) => void; onExit: () => void; onDone: () => void;
-  /** Write a new lesson rather than replaying the cached one. */
+  /** Write a new lesson rather than playing the cached one. */
   fresh?: boolean;
+  /** Going through a lesson already sat through, on purpose. It teaches nothing new, so it
+   *  records nothing: the mastery clock is not restarted and no XP is paid a second time. */
+  replay?: boolean;
 }) {
   const S = ui();
   const lang = mem.profile.target;
@@ -126,6 +131,9 @@ function Course({ mem, setMem, item, toast, onExit, onDone, fresh }: {
   const passive = step ? step.kind === 'rule' || step.kind === 'recap' : false;
 
   const finish = () => {
+    // A replay is re-reading, not being taught. Recording it would restart the mastery
+    // clock on a concept the student is merely revisiting — and pay for it again.
+    if (replay) { setFinished(true); return; }
     const m = deepClone(memRef.current);
     markCourseDone(m, item.id);
     m.xp = (m.xp || 0) + XP_COURSE;
@@ -202,9 +210,9 @@ function Course({ mem, setMem, item, toast, onExit, onDone, fresh }: {
           <div class="kicker">{S.gram.finished}</div>
           <h2 style="font-size:30px;line-height:1.1;margin-top:8px" lang={lang}>{course.title}</h2>
           <div style="margin-top:14px;font-size:14.5px;line-height:1.55;color:var(--ink2);text-wrap:pretty">
-            {S.gram.finishedSub}
+            {replay ? S.gram.replayedSub : S.gram.finishedSub}
           </div>
-          <div class="row" style="margin-top:12px"><span class="chip teal sm">+{XP_COURSE} XP</span></div>
+          {!replay && <div class="row" style="margin-top:12px"><span class="chip teal sm">+{XP_COURSE} XP</span></div>}
         </div>
         <div class="rev-actions" style="margin-top:auto;display:flex;flex-direction:column;gap:9px">
           <button class="cta" onClick={onDone}><span>{S.gram.sheet}</span></button>
@@ -270,6 +278,7 @@ function Course({ mem, setMem, item, toast, onExit, onDone, fresh }: {
                   </span>
                 : <span key={k}>{p}</span>)}
             </div>
+            {step.cue && <div class="gr-cue">{S.rev.hint} {step.cue}</div>}
             <input class="gr-input" value={typed} lang={lang} disabled={phase === 'answered'}
               placeholder={S.gram.answerHere} autocapitalize="off" autocomplete="off" spellcheck={false}
               onInput={e => setTyped((e.target as HTMLInputElement).value)}
@@ -316,9 +325,13 @@ export function gapParts(text: string): (string | null)[] {
 
 /* ----------------------------------------------------------------- the fiche */
 
-function Fiche({ mem, item, toast, onExit, onRedo }: {
+function Fiche({ mem, item, toast, onExit, onReplay, onRenew }: {
   mem: Memory; item: CompItem;
-  toast: (m: string, e?: boolean) => void; onExit: () => void; onRedo: () => void;
+  toast: (m: string, e?: boolean) => void; onExit: () => void;
+  /** Go through the lesson already written, as it was. */
+  onReplay: () => void;
+  /** Ask for a lesson written afresh, on the same concept. */
+  onRenew: () => void;
 }) {
   const S = ui();
   const lang = mem.profile.target;
@@ -406,7 +419,11 @@ function Fiche({ mem, item, toast, onExit, onRedo }: {
             <button class="btn ghost" style="flex:1" disabled={p >= pages.length - 1} onClick={() => setP(p + 1)}>{S.gram.next}</button>
           </div>
         )}
-        <button class="btn subtle big" onClick={onRedo}><I.shuffle /> {S.gram.redo}</button>
+        {/* Two different things, and the difference is worth a word each: the lesson that
+            was written, again — which costs nothing and is the same every time — or a
+            different one on the same concept. */}
+        <button class="btn ghost big" disabled={!cachedCourse(item.id)} onClick={onReplay}>{S.gram.replay}</button>
+        <button class="btn subtle big" onClick={onRenew}><I.shuffle /> {S.gram.redo}</button>
       </div>
     </div>
   );
