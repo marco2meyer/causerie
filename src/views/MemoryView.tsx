@@ -348,9 +348,7 @@ export function MemoryView({ mem, setMem, openSession, openCheckin, toast, ext }
         );
       })()}
 
-      {tab === 'gram' && (mem.profile.target === 'fr'
-        ? <GrammarQueue mem={mem} update={update} />
-        : <p class="muted" style="font-size:14px;line-height:1.5">{S.gram.frOnlyNote}</p>)}
+      {tab === 'gram' && <GrammarQueue mem={mem} update={update} />}
 
       {tab === 'prog' && (
         <div>

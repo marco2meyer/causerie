@@ -14,6 +14,22 @@ export interface CompItem {
   label: string;
 }
 
+/** What counts as a slipped accent, and what counts as a different word.
+ *
+ *  A grammar exercise is marked by comparing letters, and every language draws the line
+ *  between "you missed an accent" and "you wrote something else" in its own place. Telling a
+ *  Spanish learner that « ano » is almost « año » is not a kindness; they are different
+ *  words, and one of them is not about years. So the line lives in the pack, like every
+ *  other thing that is true of one language and not the next. */
+export interface AnswerRules {
+  /** Letters that are NOT accented variants of their base letter: a word differing only
+   *  here is a DIFFERENT word, never an accent slip. Spanish ñ is the clear case. */
+  distinct: string[];
+  /** Pairs spelled alike once the accents come off, but different words — « a » and « à »,
+   *  « el » and « él ». Each given once, in either order. */
+  homophones: [string, string][];
+}
+
 export interface CheatSheet {
   id: string;                    // matches a competency id where possible
   lang: LangCode;
@@ -116,6 +132,8 @@ export interface LangPack {
   tutor: TutorPack;
   comp: CompItem[];
   sheets: CheatSheet[];
+  /** How a typed answer in THIS language is judged. */
+  answers: AnswerRules;
   topics: Topic[];
   introTopics: { t: string; fr: string; tags: string[] }[];
   /** Survival starter deck for absolute beginners (glosses in both support languages). */

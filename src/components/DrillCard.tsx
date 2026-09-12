@@ -34,8 +34,8 @@ export function DrillCard({ drill, lang, onDone }: {
   const check = () => {
     if (answered || !canSubmit) return;
     setVerdict(choice
-      ? (checkAnswer(drill.options[picked!], drill.answer) === 'right' ? 'right' : 'wrong')
-      : checkAnswer(typed, drill.answer));
+      ? (checkAnswer(drill.options[picked!], drill.answer, lang) === 'right' ? 'right' : 'wrong')
+      : checkAnswer(typed, drill.answer, lang));
   };
 
   return (
@@ -56,7 +56,7 @@ export function DrillCard({ drill, lang, onDone }: {
         {choice ? (
           <div class="gr-opts" style="width:100%;max-width:420px">
             {drill.options.slice(0, MAX_OPTIONS).map((o, k) => {
-              const isRight = answered && checkAnswer(o, drill.answer) === 'right';
+              const isRight = answered && checkAnswer(o, drill.answer, lang) === 'right';
               const cls = answered ? (isRight ? ' right' : picked === k ? ' wrong' : ' dim') : (picked === k ? ' on' : '');
               return (
                 <button key={k} class={'gr-opt' + cls} disabled={answered}

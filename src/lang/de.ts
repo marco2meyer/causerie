@@ -389,7 +389,6 @@ export const deUi: UIStrings = {
     orderHeld: 'deine Reihenfolge',
     orderReset: 'Zurück zur automatischen Reihenfolge',
     orderNote: (n: number) => `Die ersten ${n} hältst du fest. Darunter kann eine Lücke, die ein Gespräch aufdeckt, noch aufsteigen.`,
-    frOnlyNote: 'Grammatikkurse gibt es vorerst nur für Französisch.',
     queueIntro: 'Was sie dir als Nächstes beibringt, der Reihe nach. Lücken auf deinem Niveau und darunter zuerst — schieb nach oben, was drängt, und leg beiseite, was nicht ansteht.',
     share: 'Übungen in den Wiederholungen', shareOff: 'Keine',
     shareNote: (n: number, cards: number) => `Etwa ${n} Übungen zusätzlich zu den ${cards} Karten.`,

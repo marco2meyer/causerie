@@ -3,7 +3,7 @@ import type { CourseStep, GrammarCourse, GrammarGuide, Memory } from '../types';
 import { cachedCourse, cachedGuide, forgetGuide, makeCourse, makeGuide } from '../lib/course';
 import { checkAnswer, grammarFocus, markCourseDone } from '../lib/grammar';
 import type { CompItem } from '../lib/competencies';
-import { SHEET_BY_ID } from '../lib/sheets';
+import { sheetForComp } from '../lib/sheets';
 import { saveMem } from '../lib/storage';
 import { deepClone } from '../lib/utils';
 import { Viz } from '../components/Viz';
@@ -145,7 +145,7 @@ function Course({ mem, setMem, item, toast, onExit, onDone, fresh, replay }: {
   const check = () => {
     if (!step || phase === 'answered') return;
     if (step.kind === 'gap') {
-      const v = checkAnswer(typed, step.answer);
+      const v = checkAnswer(typed, step.answer, lang);
       // An accent slip is not a right answer — the whole point of a French gap-fill is the
       // letters AND the marks on them — but it is told apart from a wrong one, because
       // "mange" for "mangé" and "manger" for "mangé" are not the same mistake.
@@ -339,9 +339,9 @@ function Fiche({ mem, item, toast, onExit, onReplay, onRenew }: {
   const [busy, setBusy] = useState(!guide);
   const [p, setP] = useState(0);
   // The pack's compact sheet: what is on screen while the detailed one is being written,
-  // and what is left if the network is not there. Four of the thirty-three French grammar
-  // cells have none, which is why this is allowed to be undefined.
-  const fallback = SHEET_BY_ID[item.id];
+  // and what is left if the network is not there. Not every cell has one in every language
+  // (see lib/sheets sheetForComp), which is why this is allowed to be undefined.
+  const fallback = sheetForComp(item.id, item.label, mem.profile.target);
 
   useEffect(() => {
     if (guide) return;
@@ -422,7 +422,12 @@ function Fiche({ mem, item, toast, onExit, onReplay, onRenew }: {
         {/* Two different things, and the difference is worth a word each: the lesson that
             was written, again — which costs nothing and is the same every time — or a
             different one on the same concept. */}
-        <button class="btn ghost big" disabled={!cachedCourse(item.id)} onClick={onReplay}>{S.gram.replay}</button>
+        {/* Never disabled. The lesson is normally sitting in the cache, and going through it
+            again costs nothing — but a cache can be empty for reasons that are none of the
+            student's business (a new device, a cleared browser, a bumped course revision that
+            retired every lesson written under the old one), and a button greyed out for a
+            reason nobody can see is worse than a button that waits five seconds. */}
+        <button class="btn ghost big" onClick={onReplay}>{S.gram.replay}</button>
         <button class="btn subtle big" onClick={onRenew}><I.shuffle /> {S.gram.redo}</button>
       </div>
     </div>

@@ -386,7 +386,6 @@ const ui: UIStrings = {
     orderHeld: 'a tua ordem',
     orderReset: 'Voltar à ordem automática',
     orderNote: (n: number) => `Manténs os primeiros ${n}. Abaixo, uma lacuna que uma chamada revele ainda pode subir.`,
-    frOnlyNote: 'Por agora, os cursos de gramática só existem em francês.',
     queueIntro: 'O que te vai ensinar a seguir, por ordem. Primeiro as lacunas do teu nível e abaixo — sobe o que urge, põe de parte o que não se aplica.',
     share: 'Exercícios nas revisões', shareOff: 'Nenhum',
     shareNote: (n: number, cards: number) => `Cerca de ${n} exercícios além das ${cards} cartas.`,
@@ -677,6 +676,14 @@ Ultimamente, foste TU a dizer ${pct} % das palavras. É o contrário do que é p
     ];
   })(),
   sheets: [],   // assigned below
+  /* Portuguese: ã and õ are nasal vowels rather than decorated ones, and the pairs below
+     turn on an accent that changes the word outright — « por » and « pôr », « pode » and
+     « pôde ». */
+  answers: {
+    distinct: [],
+    homophones: [['a', 'à'], ['e', 'é'], ['por', 'pôr'], ['pode', 'pôde'], ['esta', 'está'],
+      ['so', 'só'], ['avo', 'avô'], ['sabia', 'sabiá'], ['as', 'às'], ['ha', 'há']]
+  },
   topics: [
     { lv: 'A2', t: 'Jogo de papéis: na padaria', fr: 'jogo de papéis — és a padeira, o aluno é o cliente; fica no papel: pedido, pagamento, uma pergunta', tags: ['a cortesia', 'os números', 'comprar'] },
     { lv: 'B1', t: 'Jogo de papéis: uma reclamação', fr: 'jogo de papéis — és o apoio ao cliente, o aluno devolve um objeto partido; faz perguntas, propõe soluções, ele tem de argumentar', tags: ['argumentar', 'o pretérito'] },

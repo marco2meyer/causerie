@@ -1,6 +1,7 @@
 import type { GrammarDrill, GrammarState, GrammarTopic, Memory, Settings } from '../types';
 import { band, BANDS } from './cefr';
 import { compById, compLib, type CompItem } from './competencies';
+import { pack } from '../lang';
 import { todayISO } from './utils';
 
 /** Grammar taught outright.
@@ -378,27 +379,33 @@ function tidy(s: string): string {
     .replace(/^[\s.,!?;:«»"]+|[\s.,!?;:«»"]+$/g, '');
 }
 
-const bare = (s: string) => tidy(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
-
-/** French pairs where the accent is not a diacritic on one word but the whole difference
- *  between two words. « a » and « à » are a verb and a preposition; « ou » and « où » are
- *  "or" and "where". Calling either of those "almost — mind the accent" would teach the
- *  learner the one thing least true about them, which is the failure this whole function
- *  was written to avoid. They are simply wrong answers. */
-const HOMOPHONES = [['a', 'à'], ['ou', 'où'], ['du', 'dû'], ['la', 'là'], ['sur', 'sûr'],
-  ['mur', 'mûr'], ['cote', 'côte'], ['tache', 'tâche'], ['jeune', 'jeûne']]
-  .map(p => p.join('|'));
+/** The letters with the accents taken off — except those the language counts as letters in
+ *  their own right, which are protected so that « ano » can never be read as a near miss for
+ *  « año ». */
+function bare(s: string, distinct: string[]): string {
+  let t = tidy(s);
+  const keep = distinct.map(c => c.toLowerCase()).filter(Boolean);
+  // Park the protected letters where NFD cannot reach them, then put them back.
+  keep.forEach((ch, i) => { t = t.split(ch).join('\u0001' + i + '\u0001'); });
+  t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  keep.forEach((ch, i) => { t = t.split('\u0001' + i + '\u0001').join(ch); });
+  return t;
+}
 
 /** 'right', 'accent' (the letters are there and only the accents are wrong) or 'wrong'.
+ *
  *  The middle answer exists because telling a learner that « j'ai mange » is simply wrong
- *  teaches them nothing, and marking it right teaches them something false. */
-export function checkAnswer(given: string, answer: string): 'right' | 'accent' | 'wrong' {
+ *  teaches them nothing, and marking it right teaches them something false. WHERE that line
+ *  falls is a fact about the language rather than about this function, so it is read off the
+ *  pack: which letters are not accents at all (Spanish ñ), and which pairs are two different
+ *  words that merely look alike undressed (lang/types AnswerRules). */
+export function checkAnswer(given: string, answer: string, lang?: string): 'right' | 'accent' | 'wrong' {
   const g = tidy(given), a = tidy(answer);
   if (!g) return 'wrong';
   if (g === a) return 'right';
-  if (bare(g) !== bare(answer)) return 'wrong';
-  // Same letters, different marks — an accent slip, unless the two are a pair of different
-  // words that happen to be spelled alike without them.
-  const pair = [g, a].sort().join('|');
-  return HOMOPHONES.includes(pair) ? 'wrong' : 'accent';
+  const rules = pack(lang).answers;
+  if (bare(g, rules.distinct) !== bare(answer, rules.distinct)) return 'wrong';
+  const pair = [g, a].sort().join('\u0001');
+  return rules.homophones.some(([x, y]) => [tidy(x), tidy(y)].sort().join('\u0001') === pair)
+    ? 'wrong' : 'accent';
 }

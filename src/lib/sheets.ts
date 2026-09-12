@@ -46,6 +46,27 @@ const BANDS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
  *  student's own band, so the grammar actually cycles.
  *
  *  A pinned matrix cell is the student asking for that sheet by name, so it outranks both. */
+/** The house sheet for one competency cell, across every language.
+ *
+ *  Only the FRENCH pack numbers its sheets with the competency ids; the others drop the band
+ *  out of the middle (`es-g-a1-ser-estar` has its sheet at `es-g-ser-estar`), and some cells
+ *  have no sheet at all. So the lookup tries the id, then the id without its band, then the
+ *  keyword matching a call already uses to pick a sheet — and gives up honestly. Without the
+ *  middle step every non-French cell came back empty, which cost the lesson the canonical
+ *  rule to teach FROM and cost the fiche its offline fallback. */
+export function sheetForComp(id: string, label: string, lang?: string): CheatSheet | undefined {
+  const code = (lang && PACKS[lang as keyof typeof PACKS] ? lang : 'fr') as keyof typeof PACKS;
+  const pool = pack(code).sheets;
+  const exact = pool.find(x => x.id === id);
+  if (exact) return exact;
+  const bandless = id.replace(/-(a1|a2|b1|b2|c1|c2)-/i, '-');
+  const byBandless = pool.find(x => x.id === bandless);
+  if (byBandless) return byBandless;
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hits = (k: string) => new RegExp('\\b' + esc(norm(k)) + '\\b').test(norm(label));
+  return pool.find(x => x.match.some(hits));
+}
+
 export function sheetsForCall(mem: Memory, targets: FocusTarget[]): CheatSheet[] {
   const lang = mem.profile.target || 'fr';
   const pool = pack(lang).sheets;

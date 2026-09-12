@@ -386,7 +386,6 @@ const ui: UIStrings = {
     orderHeld: 'tu orden',
     orderReset: 'Volver al orden automático',
     orderNote: (n: number) => `Mantienes los ${n} primeros. Por debajo, una laguna que revele una llamada aún puede subir.`,
-    frOnlyNote: 'Por ahora los cursos de gramática solo existen en francés.',
     queueIntro: 'Lo que te enseñará a continuación, por orden. Primero las lagunas de tu nivel y por debajo — sube lo que urge, aparta lo que no toca.',
     share: 'Ejercicios en los repasos', shareOff: 'Ninguno',
     shareNote: (n: number, cards: number) => `Unos ${n} ejercicios además de las ${cards} tarjetas.`,
@@ -677,6 +676,16 @@ El alumno también aprende: {{autres}}. Cuando una palabra o un giro de esas len
     ];
   })(),
   sheets: [],   // assigned below
+  /* Spanish: ñ is a letter of the alphabet, not an n wearing a hat — « ano » is not a near
+     miss for « año ». The pairs below are the tilde diacrítica, which is the whole of what
+     separates a pronoun from an article or a question word from a conjunction. */
+  answers: {
+    distinct: ['ñ', 'Ñ'],
+    homophones: [['el', 'él'], ['tu', 'tú'], ['mi', 'mí'], ['si', 'sí'], ['se', 'sé'],
+      ['te', 'té'], ['de', 'dé'], ['mas', 'más'], ['aun', 'aún'], ['este', 'esté'],
+      ['esta', 'está'], ['como', 'cómo'], ['que', 'qué'], ['cuando', 'cuándo'],
+      ['donde', 'dónde'], ['quien', 'quién'], ['porque', 'porqué']]
+  },
   topics: [
     { lv: 'A2', t: 'Rol: en la panadería', fr: 'juego de rol — eres la panadera, el alumno es el cliente; quédate en tu papel: pedido, pago, una pregunta', tags: ['la cortesía', 'los números', 'comprar'] },
     { lv: 'B1', t: 'Rol: una reclamación', fr: 'juego de rol — eres atención al cliente, el alumno devuelve un objeto roto; haz preguntas, propone soluciones, él debe argumentar', tags: ['argumentar', 'el pretérito'] },

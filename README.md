@@ -95,7 +95,9 @@ there are cards are threaded through the following review sittings — added to 
 never taken from them, so the deck never loses a review to it. A few days of answering them
 well retires the concept and the next one comes up; after that the button opens the
 concept's fiche instead, as many pages as it needs. The queue can be reordered, skipped or
-marked done by hand in the settings. French only for now.
+marked done by hand in Mémoire. Every target language has its own map of thirty-odd
+grammar cells, its own cheat sheets to teach from, and its own rule for what counts as a
+slipped accent rather than a different word — Spanish ñ is a letter, not a hat.
 
 Two runtime modes, detected via `/api/health`: **server** (deployed; OpenAI key lives in
 Netlify env vars, requests authorized by access code or Google ID token) and **local**

@@ -389,7 +389,6 @@ const ui = {
     orderHeld: 'ton ordre',
     orderReset: 'Revenir à l’ordre automatique',
     orderNote: (n: number) => `Tu tiens les ${n} premiers. En dessous, une lacune découverte par un appel peut encore remonter.`,
-    frOnlyNote: 'Les cours de grammaire n’existent qu’en français pour l’instant.',
     queueIntro: 'Ce qu’elle t’apprendra ensuite, dans l’ordre. Les lacunes de ton niveau et en dessous d’abord — monte ce qui presse, écarte ce qui n’a pas lieu d’être.',
     share: 'Exercices dans les révisions', shareOff: 'Aucun',
     shareNote: (n: number, cards: number) => `Environ ${n} exercices en plus des ${cards} cartes.`,
@@ -698,6 +697,13 @@ Dernièrement, TU as prononcé ${pct} % des mots. C'est l'inverse de ce qu'il fa
     ];
   })(),
   sheets: [],   // assigned below to keep the pack literal readable
+  /* French: the ligatures fold (no keyboard has œ), and the pairs below are two words
+     that happen to share their letters once the accents come off. */
+  answers: {
+    distinct: [],
+    homophones: [['a', 'à'], ['ou', 'où'], ['du', 'dû'], ['la', 'là'], ['sur', 'sûr'],
+      ['mur', 'mûr'], ['cote', 'côte'], ['tache', 'tâche'], ['jeune', 'jeûne'], ['des', 'dès']]
+  },
   topics: [
     { lv: 'A2', t: 'Jeu de rôle : à la boulangerie', fr: 'jeu de rôle — tu es la boulangère, l’élève est le client ; reste dans ton rôle : commande, paiement, une question', tags: ['la politesse', 'les nombres', 'acheter'] },
     { lv: 'B1', t: 'Jeu de rôle : réclamation', fr: 'jeu de rôle — tu es le service client, l’élève rapporte un objet cassé ; pose des questions, propose des solutions, il doit argumenter', tags: ['argumenter', 'le passé composé'] },

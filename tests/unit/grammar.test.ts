@@ -620,3 +620,45 @@ describe('an exercise the learner can actually answer', () => {
     expect(usableStep(step({ cue: '', examples: [{ t: 'Je connais ma voisine.', gloss: 'x' }] }))).toBe(true);
   });
 });
+
+/* Where the line between "you missed an accent" and "you wrote another word" falls is a
+ * fact about the language, and it is read off the pack (lang/types AnswerRules). */
+describe('marking an answer in each language', () => {
+  it('forgives a slipped accent everywhere it really is one', () => {
+    expect(checkAnswer('mange', 'mangé', 'fr')).toBe('accent');
+    expect(checkAnswer('rapido', 'rápido', 'es')).toBe('accent');
+    expect(checkAnswer('perche', 'perché', 'it')).toBe('accent');
+    expect(checkAnswer('portugues', 'português', 'pt')).toBe('accent');
+  });
+
+  it('will not call ñ an accent, because « ano » is not a near miss for « año »', () => {
+    expect(checkAnswer('ano', 'año', 'es')).toBe('wrong');
+    expect(checkAnswer('manana', 'mañana', 'es')).toBe('wrong');
+    expect(checkAnswer('año', 'año', 'es')).toBe('right');
+    // …while an ordinary Spanish accent is still forgiven on the same word.
+    expect(checkAnswer('anos', 'años', 'es')).toBe('wrong');
+  });
+
+  it('knows each language’s pairs that are two different words', () => {
+    expect(checkAnswer('el', 'él', 'es')).toBe('wrong');     // the / he
+    expect(checkAnswer('tu', 'tú', 'es')).toBe('wrong');     // your / you
+    expect(checkAnswer('e', 'è', 'it')).toBe('wrong');       // and / is
+    expect(checkAnswer('da', 'dà', 'it')).toBe('wrong');     // from / gives
+    expect(checkAnswer('por', 'pôr', 'pt')).toBe('wrong');   // for / to put
+    expect(checkAnswer('a', 'à', 'fr')).toBe('wrong');       // has / to
+  });
+
+  it('does not carry one language’s pairs into another', () => {
+    // « e » and « è » are two words in Italian; in Portuguese « e »/« é » is the pair, and
+    // in French neither is a word of that shape at all.
+    expect(checkAnswer('e', 'é', 'pt')).toBe('wrong');
+    expect(checkAnswer('la', 'là', 'it')).toBe('wrong');
+    expect(checkAnswer('cote', 'côte', 'fr')).toBe('wrong');
+    expect(checkAnswer('cote', 'côte', 'pt')).toBe('accent');   // not a pair in Portuguese
+  });
+
+  it('has nothing to forgive in English', () => {
+    expect(checkAnswer('have', 'have', 'en')).toBe('right');
+    expect(checkAnswer('hav', 'have', 'en')).toBe('wrong');
+  });
+});

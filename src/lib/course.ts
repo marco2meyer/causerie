@@ -2,7 +2,7 @@ import type { CourseStep, GrammarCourse, GrammarDrill, GrammarGuide, GrammarViz,
 import { api, OAI } from './api';
 import { pack } from '../lang';
 import type { CompItem } from './competencies';
-import { SHEET_BY_ID } from './sheets';
+import { sheetForComp } from './sheets';
 import { activeProfile } from './profiles';
 import { checkAnswer } from './grammar';
 import { scrubHint } from './hints';
@@ -255,7 +255,7 @@ const nativeName = (mem: Memory) => (mem.profile.native === 'en' ? 'English' : '
  *  and one that does not is a textbook page. Matched on the correction's own cefr_topic and
  *  on the cheat-sheet keywords for the cell, which is the same matching lib/sheets does. */
 export function ownErrors(mem: Memory, item: CompItem, n = 5): { wrong: string; better: string }[] {
-  const sheet = SHEET_BY_ID[item.id];
+  const sheet = sheetForComp(item.id, item.label, mem.profile.target);
   const keys = [...(sheet?.match ?? []), item.label].map(norm).filter(k => k.length > 3);
   if (!keys.length) return [];
   // Whole words, and only against the correction's own CEFR topic — the label the analysis
@@ -280,8 +280,8 @@ export function ownErrors(mem: Memory, item: CompItem, n = 5): { wrong: string; 
 
 /** The canonical rule as the pack already states it, so the model teaches the French that
  *  is in the app rather than the French it feels like inventing today. */
-function sheetBrief(item: CompItem): string {
-  const s = SHEET_BY_ID[item.id];
+function sheetBrief(item: CompItem, lang: string): string {
+  const s = sheetForComp(item.id, item.label, lang);
   if (!s) return '(no house sheet for this cell — rely on standard grammar)';
   return [
     'House sheet «' + s.title + '»:',
@@ -296,7 +296,7 @@ function learnerBrief(mem: Memory, item: CompItem): string {
   const cell = mem.comp?.[item.id];
   return [
     `Concept: «${item.label}» (${item.band}).`,
-    sheetBrief(item),
+    sheetBrief(item, mem.profile.target),
     `Learner: native ${nativeName(mem)}, interests: ${interests || '(unknown)'}.`,
     cell ? `The matrix has this cell as ${cell.status}${cell.evidence ? ', from: «' + cell.evidence + '»' : ''}.`
       : 'The matrix has never seen this cell used.',
@@ -491,7 +491,7 @@ async function writeBank(mem: Memory, item: CompItem): Promise<GrammarDrill[]> {
   const raw = parseReply<{ bank: GrammarDrill[] }>(content, 'bank');
   const bank = (raw.bank ?? [])
     .map(d => ({ ...d, topic: item.id, cue: scrubHint(d.cue, d.answer) ?? '' }))
-    .filter(usableDrill);
+    .filter(d => usableDrill(d, mem.profile.target));
   if (!bank.length) throw new Error('bank: nothing usable came back');
   const course = cachedCourse(item.id);
   if (course) cacheCourse({ ...course, bank }, who);
@@ -538,7 +538,7 @@ export function usableStep(s: GrammarCourse['steps'][number]): boolean {
 const teachesByExample = (steps: GrammarCourse['steps']): boolean =>
   steps.some(s => s.kind === 'discover') && steps.some(s => s.examples.length >= 2);
 
-export function usableDrill(d: GrammarDrill): boolean {
+export function usableDrill(d: GrammarDrill, lang?: string): boolean {
   if (!oneGap(d.text) || !d.answer.trim()) return false;
   // A choice exercise shows its options, so the answer is findable among them; a typed one
   // shows nothing, and without a cue it is a guess.
@@ -552,7 +552,7 @@ export function usableDrill(d: GrammarDrill): boolean {
     // Bounded by what the player RENDERS, not by what came back: an answer sitting past the
     // last option drawn on screen cannot be picked, so the exercise would be unwinnable.
     return d.options.length >= 2 && d.options.length <= MAX_OPTIONS && distinct(d.options)
-      && d.options.some(o => checkAnswer(o, d.answer) === 'right');
+      && d.options.some(o => checkAnswer(o, d.answer, lang) === 'right');
   }
   return true;
 }

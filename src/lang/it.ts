@@ -386,7 +386,6 @@ const ui: UIStrings = {
     orderHeld: 'il tuo ordine',
     orderReset: 'Tornare all’ordine automatico',
     orderNote: (n: number) => `Tieni fermi i primi ${n}. Sotto, una lacuna emersa da una chiamata può ancora salire.`,
-    frOnlyNote: 'Per ora i corsi di grammatica esistono solo per il francese.',
     queueIntro: 'Che cosa ti insegnerà dopo, in ordine. Prima le lacune del tuo livello e sotto — sposta in alto ciò che preme, metti da parte ciò che non serve.',
     share: 'Esercizi nei ripassi', shareOff: 'Nessuno',
     shareNote: (n: number, cards: number) => `Circa ${n} esercizi oltre alle ${cards} carte.`,
@@ -677,6 +676,13 @@ Ultimamente hai pronunciato TU il ${pct} % delle parole. È l'esatto contrario d
     ];
   })(),
   sheets: [],   // assigned below
+  /* Italian: the accent is what tells a verb from a conjunction — « e » and « è », « da »
+     and « dà » — and getting it wrong is writing the other word, not misspelling this one. */
+  answers: {
+    distinct: [],
+    homophones: [['e', 'è'], ['da', 'dà'], ['si', 'sì'], ['la', 'là'], ['li', 'lì'],
+      ['ne', 'né'], ['se', 'sé'], ['te', 'tè'], ['do', 'dò'], ['sta', 'stà']]
+  },
   topics: [
     { lv: 'A2', t: 'Gioco di ruolo: in panetteria', fr: 'gioco di ruolo — sei la panettiera, l’allievo è il cliente; resta nel ruolo: ordine, pagamento, una domanda', tags: ['la cortesia', 'i numeri', 'comprare'] },
     { lv: 'B1', t: 'Gioco di ruolo: un reclamo', fr: 'gioco di ruolo — sei il servizio clienti, l’allievo riporta un oggetto rotto; fai domande, proponi soluzioni, lui deve argomentare', tags: ['argomentare', 'il passato prossimo'] },

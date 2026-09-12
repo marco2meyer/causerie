@@ -112,10 +112,10 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
   const peekDate = peek?.sourceSessionId
     ? mem.sessions.find(x => x.id === peek.sourceSessionId)?.date
     : undefined;
-  // The grammar strand: one concept at a time, taken from the competency map. French only
-  // for now — the courses and their exercises are written against the French map, and the
-  // other packs' cheat sheets do not share their competency ids (see lib/sheets).
-  const grammarOn = mem.profile.target === 'fr' && !intro;
+  // The grammar strand: one concept at a time, taken from the competency map. Every target
+  // language has one — thirty-odd grammar cells apiece — and the lesson is written against
+  // whichever pack the profile is learning (see lib/course).
+  const grammarOn = !intro;
   const gram = useMemo(() => (grammarOn ? grammarFocus(mem) : null), [mem, grammarOn]);
   // What tonight's sitting will carry on top of its cards, so the review block can say so
   // rather than surprising the student with four extra screens. Counted from the BANKS, not

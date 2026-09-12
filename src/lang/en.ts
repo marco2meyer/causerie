@@ -386,7 +386,6 @@ const ui: UIStrings = {
     orderHeld: 'your order',
     orderReset: 'Back to the automatic order',
     orderNote: (n: number) => `You are holding the first ${n}. Below them a gap a call turns up can still climb.`,
-    frOnlyNote: 'Grammar courses exist only for French for now.',
     queueIntro: 'What she will teach you next, in order. Gaps at your level and below come first — move up what is pressing, set aside what is not.',
     share: 'Exercises in reviews', shareOff: 'None',
     shareNote: (n: number, cards: number) => `About ${n} exercises on top of the ${cards} cards.`,
@@ -678,6 +677,8 @@ Lately, YOU spoke ${pct} % of the words. That is the wrong way round: by the end
     ];
   })(),
   sheets: [],   // assigned below
+  /* English writes no accents, so there is no line to draw: a wrong letter is a wrong word. */
+  answers: { distinct: [], homophones: [] },
   topics: [
     { lv: 'A2', t: 'Role play: at the bakery', fr: 'role play — you are the baker, the student is the customer; stay in role: ordering, paying, one question', tags: ['politeness', 'numbers', 'shopping'] },
     { lv: 'B1', t: 'Role play: a complaint', fr: 'role play — you are customer service, the student returns a broken item; ask questions, offer solutions, they must argue their case', tags: ['arguing a case', 'past tenses'] },

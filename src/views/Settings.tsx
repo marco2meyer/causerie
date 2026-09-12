@@ -230,8 +230,7 @@ export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast, ext }: P
           </div>
         </div>
         <div class="tiny" style="margin:2px 0 6px">{S.settings.rhythmNote(sustainableNewPerDay(s), dailyReviewCapacity(s))}</div>
-        {mem.profile.target === 'fr' && (
-          <div>
+        <div>
             <div class="kv"><span class="k">{S.gram.share}</span>
               <div class="pills">
                 <button class={'pill ' + ((s.grammarShare ?? GRAMMAR_SHARE) === 0 ? 'on' : '')}
@@ -246,7 +245,6 @@ export function Settings({ mem, setMem, apiInfo, refreshApi, go, toast, ext }: P
               {S.gram.shareNote(drillCount({ grammarShare: s.grammarShare ?? GRAMMAR_SHARE }, Math.max(1, s.sessionSize)), Math.max(1, s.sessionSize))}
             </div>
           </div>
-        )}
         <div class="kv"><span class="k">{S.settings.speakAnswers}</span>
           <div class="pills">
             <button class={'pill ' + (s.speakAnswers ? 'on' : '')} onClick={() => upd(m => (m.settings.speakAnswers = true))}>{S.settings.yes}</button>
