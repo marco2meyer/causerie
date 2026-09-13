@@ -6,6 +6,7 @@ import { focusTargets } from '../lib/focus';
 import { inIntroPhase, introCallsDone } from '../lib/gamify';
 import { portrait } from '../lib/portrait';
 import { buildTutorPrompt, TEMPLATE_VARS } from '../lib/prompts';
+import { RECALL_MINUTES, recall } from '../lib/recall';
 import { activeProfile, deleteProfile, forgetProfileElsewhere } from '../lib/profiles';
 import { migrate, saveMem, wipeMem } from '../lib/storage';
 import type { CompanionModule } from '../lib/companionSeam';
@@ -101,7 +102,7 @@ export function MemoryView({ mem, setMem, openSession, openCheckin, toast, ext }
       topic: next.t, topicFr: next.fr,
       targets: intro ? [] : focusTargets(mem, 3),
       mode: intro ? 'intro' : 'daily',
-      minutes: mem.settings.minutesHint
+      minutes: mem.settings.minutesHint + (!intro && recall(mem) ? RECALL_MINUTES : 0)
     });
   }, [mem, intro]);
 

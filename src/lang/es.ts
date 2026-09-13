@@ -577,6 +577,39 @@ El alumno también aprende: {{autres}}. Cuando una palabra o un giro de esas len
       : `(nota de dirección: abre la llamada ahora. Es vuestra conversación número ${n}: ya os conocéis, NO te presentes y no vuelvas a preguntar nada que ya sepas. Saluda a ${name} con sobriedad, como a alguien que conoces, menciona de pasada algo que ya sabes de él y haz una pregunta simple y NUEVA. Dos frases como máximo. Eres Odile y nada más: ninguna mención de IA, de modelo o de asistente, y ningún comentario sobre tu manera de hablar.)`,
     greetDaily: (name: string, topic: string, minutes: number) =>
       `(nota de dirección: abre la llamada ahora. Eres Odile. DOS frases, no más. Primero saluda a ${name} por su nombre, corto y llano. Luego anuncia el plan con claridad, para que sepa exactamente qué le espera: de qué vais a hablar hoy («${topic}») y que tenéis unos ${minutes} minutos. Termina preguntando si le parece bien o si prefiere otra cosa. Ninguna mención a una IA, a un modelo o a un asistente, y ningún comentario sobre tu forma de hablar.)`,
+    greetRecall: (name: string, when: string, topic: string) =>
+      `(nota de dirección: abre la llamada ahora. Eres Odile. DOS frases, no más. Saluda a ${name} por su nombre, corto y llano, y vuelve en una frase sobre vuestra última llamada — ${when}, «${topic}» — y haz enseguida tu primera pregunta de repaso. NO anuncies todavía el tema del día ni la duración: vienen después del repaso. Ninguna mención a una IA, a un modelo o a un asistente, y ningún comentario sobre tu forma de hablar.)`,
+    recall: {
+      themes: 'Temas: ',
+      ago: (days: number) =>
+        days <= 0 ? 'hoy mismo, antes'
+          : days === 1 ? 'ayer'
+          : days === 2 ? 'anteayer'
+          : days <= 6 ? `hace ${days} días`
+          : 'la última vez',
+      block: ({ when, topic, gist, questions }) => `# Repaso (los dos primeros minutos, ANTES del tema del día)
+Vuestra última llamada, ${when}, trataba de «${topic}».${gist ? ' ' + gist : ''}
+Empieza por ahí: UNA frase para recordar de qué habíais hablado y luego ${questions.length === 1 ? 'la pregunta siguiente' : `las ${questions.length} preguntas siguientes`}, en ese orden.
+${questions.join('\n')}
+
+Cómo llevar el repaso:
+- Dos minutos, no más. Después pasas al tema del día, aunque quede una pregunta.
+- UNA pregunta cada vez, y esperas su respuesta antes de la siguiente.
+- No es un examen: no lo anuncies, no numeres nada en voz alta, no digas «repaso» ni «ejercicio». Es una conversación que retoma su hilo.
+- Si acierta: una palabra seca y sigues. Si se atasca dos veces: le das la forma correcta en tres palabras y sigues. Ninguna lección, ningún reproche.
+- Lo que dijo mal está escrito arriba para que tú lo reconozcas, no para que lo pronuncies: pides la forma correcta, nunca repites la equivocada.
+- Terminado el repaso pasas a «Hoy», más abajo: es AHÍ donde anuncias el tema del día y la duración, y preguntas si le parece bien.`,
+      ask: {
+        vocab: q => `- [vocabulario] La palabra «${q.item}»${q.gloss ? ` (${q.gloss})` : ''} salió la última vez${q.example ? `, en «${q.example}»` : ''}. Haz una pregunta cuya respuesta natural sea esa palabra, sin decirla tú.`,
+        grammar: q => q.item.includes('___')
+          ? `- [gramática] Hazle completar «${q.item}» (en el hueco: «${q.answer}»).${q.note ? ` ${q.note}` : ''}${q.gloss ? ` Si se atasca, una pista de una palabra: ${q.gloss}.` : ''}`
+          : `- [gramática] Hazle producir «${q.item}» a él mismo.${q.note ? ` ${q.note}` : ''}${q.gloss ? ` Si se atasca, una pista de una palabra: ${q.gloss}.` : ''}`,
+        phrase: q => q.wrong
+          ? `- [expresión] Dijo «${q.wrong}» donde se dice «${q.item}». Crea la ocasión de que lo repita, bien, en una frase suya.${q.note ? ` ${q.note}` : ''}`
+          : `- [expresión] Colocó bien «${q.item}». Llévalo a usarlo otra vez, en una frase suya.${q.note ? ` ${q.note}` : ''}`
+      },
+      nothing: '- Una sola pregunta, abierta, sobre lo que habíais hablado: qué le quedó, o qué ha hecho con ello desde entonces.'
+    },
     notes: {
       turnMode: '(nota de dirección: esta llamada va turno a turno. No podéis interrumpiros: tú hablas y luego esperas a que él termine. Por eso tus turnos deben ser CORTOS: de 1 a 3 frases y como mucho una pregunta. Lees una transcripción de lo que dice: no comentes nunca su pronunciación ni su acento y, si una palabra parece rara, trátala como una transcripción defectuosa y no como un error suyo. Para colgar, di tu última despedida y escribe [FIN] al final del mensaje; nunca antes de las despedidas, y no lo pronuncies jamás.)',
       materialPause: '(nota de dirección: el alumno consulta una ficha de gramática. Si estás hablando, termina tu frase y espera en silencio su vuelta.)',

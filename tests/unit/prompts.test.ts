@@ -37,11 +37,23 @@ describe('buildTutorPrompt', () => {
 });
 
 describe('greetingPrompt', () => {
-  it('mentions name and topic in the daily variant', () => {
+  it('mentions name and topic in the daily variant, when there is no call to come back to', () => {
     const m = seedMem('Marco');
+    m.sessions = [];
+    m.introDone = true;
     const g = greetingPrompt(m, { topic: 'La cuisine', topicFr: 'la cuisine' });
     expect(g).toContain('Marco');
     expect(g).toContain('la cuisine');
+  });
+  it('opens on the last call instead, once there is one', () => {
+    const m = seedMem('Marco');
+    m.introDone = true;
+    const g = greetingPrompt(m, { topic: 'La cuisine', topicFr: 'la cuisine' });
+    expect(g).toContain('Marco');
+    // The subject of the day is announced after the reprise, not over the top of it.
+    expect(g).not.toContain('la cuisine');
+    expect(g).toContain('Dessiner des arbres et des chats');
+    expect(g).toContain('reprise');
   });
   it('introduces herself only on the true first call', () => {
     const m = seedMem('Marco');

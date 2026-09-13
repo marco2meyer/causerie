@@ -6,6 +6,7 @@ import { probeTargets } from './competencies';
 import { inIntroPhase, introCallsDone } from './gamify';
 import { LANGS } from './langs';
 import { portrait, portraitText } from './portrait';
+import { recall, recallText } from './recall';
 import { talkAlert } from './talk';
 import { listProfiles, profileLang } from './profiles';
 
@@ -31,7 +32,14 @@ export function resolveTemplate(template: string, vars: Record<string, string>):
   return template.replace(/\{\{(\w+)\}\}/g, (m, key: string) => (key in vars ? vars[key] : m));
 }
 
-export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 'topicFr' | 'targets' | 'mode' | 'minutes' | 'topicTags'>): string {
+/** The previous call, as the day's opening — daily calls only. The getting-to-know-you
+ *  calls have their own shape and, on the first of them, nothing to come back to. */
+const recallFor = (mem: Memory, sess: Pick<CallSession, 'mode' | 'wordGoals'>) =>
+  sess.mode === 'intro' || inIntroPhase(mem)
+    ? null
+    : recall(mem, { skip: (sess.wordGoals ?? []).map(g => g.word) });
+
+export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 'topicFr' | 'targets' | 'mode' | 'minutes' | 'topicTags' | 'wordGoals'>): string {
   const p = mem.profile;
   const P = pack(p.target);
   const tp = P.tutor;
@@ -62,6 +70,11 @@ export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 
   // tutor into the new one mid-note.
   const ho = handoverActive(mem);
   const passation = ho ? PACKS[p.target]?.tutor.handover({ name: ho.from.name, gender: ho.from.gender }) + '\n\n' : '';
+  // Yesterday, before today. Injected into the day block rather than given its own
+  // {{placeholder}} for the same reason the talk alert is: a student who has edited their
+  // own briefing would never see a variable added after they saved it.
+  const rec = recallFor(mem, sess);
+  const reprise = rec ? recallText(rec, tp.recall) + '\n\n' : '';
   const vars: Record<string, string> = {
     name: p.name || tp.fallbacks.student,
     native,
@@ -75,7 +88,7 @@ export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 
     competences: (['grammar', 'vocabulary', 'fluency', 'comprehension'] as const)
       .map(k => `${P.ui.skills[k]} : ${idxLvl(mem.cefr.skills[k])}`).join(', '),
     persona: tp.persona[p.persona === 'warm' ? 'warm' : 'deadpan'],
-    aujourdhui: passation + a0 + interf + hog + (sess.mode === 'intro'
+    aujourdhui: passation + a0 + interf + hog + reprise + (sess.mode === 'intro'
       ? tp.todayIntro(introN(mem))
       : tp.todayTopic(sess.topicFr || sess.topic) + (sess.topicTags?.length ? tp.todayFields(sess.topicTags.join(', ')) : '')),
     minutes: String(sess.minutes ?? mem.settings.minutesHint ?? 4),
@@ -100,7 +113,7 @@ export function buildTutorPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 
  *  response.create — never as response-level instructions, which would REPLACE the
  *  session briefing for that response and let the model open with its default persona
  *  ("Je m'appelle ChatGPT…"). The cue names Odile anyway, as a second safety net. */
-export function greetingPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 'topicFr' | 'mode' | 'minutes'>): string {
+export function greetingPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 'topicFr' | 'mode' | 'minutes' | 'wordGoals'>): string {
   const tp = pack(mem.profile.target).tutor;
   const name = mem.profile.name || tp.fallbacks.student;
   if (sess.mode === 'intro') return tp.greetIntro(name, introN(mem));
@@ -108,6 +121,10 @@ export function greetingPrompt(mem: Memory, sess: Pick<CallSession, 'topic' | 't
   // themselves — because for these two people it is one.
   const ho = handoverActive(mem);
   if (ho && ho.calls === 0) return tp.greetIntro(name, 1);
+  // When there is a call to come back to, that is what she opens on: the subject of the
+  // day and the length are announced after the reprise, not over the top of it.
+  const rec = recallFor(mem, sess);
+  if (rec) return tp.greetRecall(name, tp.recall.ago(rec.days), rec.topic);
   return tp.greetDaily(name, sess.topicFr || sess.topic, sess.minutes ?? mem.settings.minutesHint ?? 8);
 }
 

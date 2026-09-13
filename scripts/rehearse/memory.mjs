@@ -41,8 +41,27 @@ export function rehearsalMemory(blankMem) {
       summary: 'Thèmes : la maison, le matin. Il décrit les pièces sans hésiter, mais perd le genre des noms.' },
     { id: 's2', date: '2026-09-08', at: '2026-09-08T08:37:00.000Z', topic: 'La chambre libre ce soir', source: 'causerie', minutes: 10, seconds: 584, analysis: null, tutorShare: 0.41,
       summary: 'Thèmes : la colocation, une chambre libre. Phrases plus longues ; « il faut que » encore à l’indicatif.' },
-    { id: 's3', date: '2026-09-09', at: '2026-09-09T06:14:00.000Z', topic: 'Une maison avec huit personnes', source: 'causerie', minutes: 10, seconds: 574, analysis: null, tutorShare: 0.48,
-      summary: 'Thèmes : les règles de la maison, les livres. Le subjonctif après « important que » ne vient pas encore.' }
+    // The last call carries an analysis, because the call under rehearsal now OPENS on it:
+    // the reprise (lib/recall) is built from new_vocab, corrections and highlights, and a
+    // run against three summary-only sessions would rehearse an opening nobody will get.
+    { id: 's3', date: '2026-09-09', at: '2026-09-09T06:14:00.000Z', topic: 'Une maison avec huit personnes', source: 'causerie', minutes: 10, seconds: 574, tutorShare: 0.48,
+      summary: 'Thèmes : les règles de la maison, les livres. Le subjonctif après « important que » ne vient pas encore.',
+      analysis: {
+        new_vocab: [
+          { fr: 'une étagère', de: 'ein Regal', ex: 'Les livres sont sur l’étagère.' },
+          { fr: 'la moisissure', de: 'der Schimmel', ex: 'On ne veut pas de moisissure dans la cuisine.' }
+        ],
+        corrections: [
+          { user_turn: 4, original: 'Il est important que tout le monde range', besser: 'Il est important que tout le monde range ses affaires',
+            erklaerung: 'Après « il est important que », le subjonctif.', category: 'grammar', cefr_topic: 'Subjonctif après « important que »',
+            cloze_text: 'Il est important que chacun ___ ses affaires.', cloze_answer: 'range', hint: 'aufräumen (Konjunktiv)' },
+          { user_turn: 9, original: 'je suis d’accord avec ça', besser: 'ça me va',
+            erklaerung: 'Plus court, plus courant à l’oral.', category: 'phrase', cefr_topic: 'accord',
+            cloze_text: 'Ça me ___.', cloze_answer: 'va', hint: 'passen' }
+        ],
+        highlights: [{ user_turn: 6, quote: 'petit à petit', kommentar: 'Bien placé.' }],
+        topics: ['les règles de la maison', 'les livres']
+      } }
   ];
   m.vocab = [
     { fr: 'la reliure', de: 'der Bucheinband', ex: 'La reliure du livre est abîmée.', date: '2026-09-09' },
@@ -54,11 +73,21 @@ export function rehearsalMemory(blankMem) {
 }
 
 /** A memory whose last calls make her the one doing the talking, so the run can check that
- *  the alert reaches the briefing (lib/talk talkAlert): three balanced calls, then a bad one. */
+ *  the alert reaches the briefing (lib/talk talkAlert): three balanced calls, then a bad one.
+ *
+ *  The shares are attached to the fixture's own calls rather than replacing them with bare
+ *  records. Two blocks of the briefing read those calls — the list of previous
+ *  conversations, and now the reprise the call opens on — and a run whose history was four
+ *  sessions called "appel" with nothing in them rehearsed neither. */
 export function withTalkHistory(mem, shares = [0.41, 0.48, 0.45, 0.63]) {
-  const sessions = shares.map((tutorShare, i) => ({
-    id: 'h' + i, date: '2026-09-0' + (5 + i), topic: 'appel', source: 'causerie', minutes: 10, seconds: 580,
-    analysis: null, tutorShare
-  }));
-  return { ...mem, sessions };
+  const base = mem.sessions ?? [];
+  const filler = Math.max(0, shares.length - base.length);
+  const sessions = [
+    ...Array.from({ length: filler }, (_, i) => ({
+      id: 'h' + i, date: '2026-09-0' + (5 + i), topic: 'appel', source: 'causerie', minutes: 10, seconds: 580,
+      analysis: null, summary: 'Thèmes : la semaine, le travail.'
+    })),
+    ...base.slice(-shares.length)
+  ];
+  return { ...mem, sessions: sessions.map((s, i) => ({ ...s, tutorShare: shares[i] ?? s.tutorShare })) };
 }

@@ -41,6 +41,8 @@ src/
     realtime.ts             RealtimeCall: WebRTC to OpenAI Realtime, transcripts, time nudges
     prompts.ts              tutor briefing (verbatim in the memory tab): persona, facts,
                             targets, topic proposal, intro agenda, call-length format
+    recall.ts               the two minutes a call opens with: what the last one was about
+                            and one to three questions off its own analysis
     analysis.ts             post-call analysis: JSON schema (incl. cloze + facts), fallback chain
     merge.ts                applyAnalysis: analysis → memory (statuses, levels, facts, cards, XP)
     srs.ts                  SM-2 scheduling, session builder, cardsFromAnalysis
@@ -84,6 +86,16 @@ note per word goal when it appears on screen → hang up → `analysis.ts` retur
 folds it into `Memory` and `srs.ts` turns it into deck cards, as many as `budget.ts`
 allows → `Review` shows transcript + new cards → `ReviewSession` runs its 18 cards with
 SM-2 grading and TTS, twice a day → streak counts both halves of the day.
+
+A call does not open on the subject of the day. It opens on the last one: `recall.ts`
+reads that call's own analysis and hands Odile what it produced — a word from `new_vocab`,
+a mistake with its gap and its answer, a turn of phrase she put right or he got right — and
+she spends two minutes asking for one to three of them out loud before anything else. The
+two minutes are **added** to the call, not taken out of it, and the questions are asked,
+never read: she is told to elicit the word rather than say it, and never to voice the wrong
+form back at him. A first call, or the first after a tutor handover, has nothing to come
+back to and opens the old way. `node scripts/recall-preview.mjs` replays the openings the
+last few real calls would have had, which is the only honest way to judge them.
 
 The grammar strand runs off the same competency matrix. `grammar.ts` ranks the map's
 thirty-three French grammar cells — failed first, then mixed, then never observed, always

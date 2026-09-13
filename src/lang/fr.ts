@@ -586,6 +586,39 @@ Dernièrement, TU as prononcé ${pct} % des mots. C'est l'inverse de ce qu'il fa
       : `(note de régie : ouvre l'appel maintenant. C'est votre ${n}e conversation : vous vous connaissez déjà, NE te présente PAS et ne redemande rien que tu sais déjà. Salue ${name} sobrement, comme quelqu'un que tu connais, fais référence en passant à une chose que tu sais de lui, puis pose une question simple et NOUVELLE. Deux phrases maximum. Tu es Odile et rien d'autre : aucune mention d'IA, de modèle ou d'assistant, et aucun commentaire sur ta manière de parler.)`,
     greetDaily: (name: string, topic: string, minutes: number) =>
       `(note de régie : ouvre l’appel maintenant. Tu es Odile. DEUX phrases, pas plus. D’abord salue ${name} par son prénom, court et plat. Ensuite annonce le programme clairement, pour qu’il sache exactement ce qui l’attend : de quoi vous allez parler aujourd’hui (« ${topic} »), et que vous avez environ ${minutes} minutes ensemble. Termine en demandant si ça lui va ou s’il préfère autre chose. Aucune mention d’IA, de modèle ou d’assistant, et aucun commentaire sur ta manière de parler.)`,
+    greetRecall: (name: string, when: string, topic: string) =>
+      `(note de régie : ouvre l’appel maintenant. Tu es Odile. DEUX phrases, pas plus. Salue ${name} par son prénom, court et plat, puis reviens en une phrase sur votre dernier appel — ${when}, « ${topic} » — et pose aussitôt ta première question de reprise. N’annonce PAS encore le sujet du jour ni la durée : ils viennent après la reprise. Aucune mention d’IA, de modèle ou d’assistant, et aucun commentaire sur ta manière de parler.)`,
+    recall: {
+      themes: 'Thèmes : ',
+      ago: (days: number) =>
+        days <= 0 ? 'plus tôt aujourd’hui'
+          : days === 1 ? 'hier'
+          : days === 2 ? 'avant-hier'
+          : days <= 6 ? `il y a ${days} jours`
+          : 'la dernière fois',
+      block: ({ when, topic, gist, questions }) => `# Reprise (les deux premières minutes, AVANT le sujet du jour)
+Votre dernier appel, ${when}, portait sur « ${topic} ».${gist ? ' ' + gist : ''}
+Commence par là : UNE phrase pour rappeler de quoi vous aviez parlé, puis ${questions.length === 1 ? 'la question suivante' : `les ${questions.length} questions suivantes`}, dans cet ordre.
+${questions.join('\n')}
+
+Conduite de la reprise :
+- Deux minutes, pas plus. Ensuite tu passes au sujet du jour, même s’il reste une question.
+- UNE question à la fois, et tu attends sa réponse avant la suivante.
+- Ce n’est pas un contrôle : ne l’annonce pas, ne numérote rien à voix haute, ne dis ni « révision » ni « exercice ». C’est une conversation qui reprend son fil.
+- S’il trouve : un mot sec, et tu enchaînes. S’il sèche deux fois : donne la forme juste en trois mots et enchaîne. Aucune leçon, aucun reproche.
+- Ce qu’il avait dit de travers est écrit ci-dessus pour que tu le reconnaisses, pas pour que tu le prononces : tu demandes la forme juste, tu ne redis jamais la fausse.
+- La reprise finie, tu enchaînes sur « Aujourd’hui » plus bas : c’est LÀ que tu annonces le sujet du jour et la durée, et que tu demandes si ça lui va.`,
+      ask: {
+        vocab: q => `- [vocabulaire] Le mot « ${q.item} »${q.gloss ? ` (${q.gloss})` : ''} est venu la dernière fois${q.example ? `, dans « ${q.example} »` : ''}. Pose une question dont ce mot est la réponse naturelle — sans le dire toi-même.`,
+        grammar: q => q.item.includes('___')
+          ? `- [grammaire] Fais-lui compléter « ${q.item} » (dans le trou : « ${q.answer} »).${q.note ? ` ${q.note}` : ''}${q.gloss ? ` S’il sèche, un indice en un mot : ${q.gloss}.` : ''}`
+          : `- [grammaire] Fais-lui produire lui-même « ${q.item} ».${q.note ? ` ${q.note}` : ''}${q.gloss ? ` S’il sèche, un indice en un mot : ${q.gloss}.` : ''}`,
+        phrase: q => q.wrong
+          ? `- [expression] Il avait dit « ${q.wrong} » là où on dit « ${q.item} ». Crée l’occasion de la redire, correctement, dans une phrase à lui.${q.note ? ` ${q.note}` : ''}`
+          : `- [expression] Il avait bien placé « ${q.item} ». Amène-le à s’en resservir, dans une phrase à lui.${q.note ? ` ${q.note}` : ''}`
+      },
+      nothing: '- Une seule question, ouverte, sur ce dont vous aviez parlé : ce qui lui en est resté, ou ce qu’il en a fait depuis.'
+    },
     notes: {
       turnMode: '(note de régie : cet appel se fait tour par tour. Vous ne pouvez pas vous interrompre : tu parles, puis tu attends qu’il ait fini. Tes tours doivent donc rester COURTS — 1 à 3 phrases, puis au plus une question. Tu lis une transcription de ce qu’il dit : ne commente jamais sa prononciation ni son accent, et si un mot semble étrange, traite-le comme un mot mal transcrit plutôt que comme une faute de sa part. Pour raccrocher, dis ton dernier au revoir puis écris [FIN] tout à la fin du message ; jamais avant les adieux, et ne le prononce jamais.)',
       materialPause: '(note de régie : l’élève consulte une fiche de grammaire. Si tu parles, termine ta phrase, puis attends en silence son retour.)',

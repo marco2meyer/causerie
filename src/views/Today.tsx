@@ -9,6 +9,7 @@ import { callDoneOn, inIntroPhase, introCallsDone, reviewSessionsOn } from '../l
 import { LANGS } from '../lib/langs';
 import { earDay, earPhase } from '../lib/pron';
 import { peekRevState } from '../lib/revstate';
+import { RECALL_MINUTES, recall } from '../lib/recall';
 import { daysSkipped } from '../lib/month';
 import { beyondPlan, sessionsPerDay, sittingPlan } from '../lib/budget';
 import { buildSession } from '../lib/srs';
@@ -191,6 +192,11 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
   // the call stays short (Fluent Forever's ordering: ears before mouth).
   const ear = earPhase(mem);
   const callMinutes = ear ? Math.min(4, mem.settings.minutesHint) : mem.settings.minutesHint;
+  // The two minutes she spends on the last call are ADDED to the call, never taken out of
+  // the subject of the day: a reprise paid for out of the conversation would be a shorter
+  // conversation, which is the one thing the app cannot afford to sell.
+  const reprise = useMemo(() => !intro && !!recall(mem), [mem, intro]);
+  const totalMinutes = callMinutes + (reprise ? RECALL_MINUTES : 0);
 
   /** Minimal-pair ear training: its own block — THE daily centre piece during the
    *  first two weeks at A0/A1 (with shorter calls), an extra on higher levels. */
@@ -211,7 +217,7 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
       level: band(mem.cefr.overall),
       targets: intro ? [] : targets,
       mode: intro ? 'intro' : 'daily',
-      minutes: callMinutes,
+      minutes: totalMinutes,
       materials: sheets.map(x => x.id),
       // Not during the getting-to-know-you calls: those exist to find out what the learner
       // has, and a word goal presumes an answer they have not been asked for yet.
@@ -279,7 +285,7 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
         )}
         <button class={'cta' + (callDone ? ' quiet' : '')} onClick={begin} disabled={!ready}>
           <span>{callDone ? S.today.callAgain : S.today.callOdile}</span>
-          <span class="meta">{callMinutes} min</span>
+          <span class="meta">{totalMinutes} min</span>
         </button>
       </div>
 

@@ -86,6 +86,28 @@ export interface TutorPack {
   /** Opening cue for a normal call. `minutes` so the student hears the shape of the next
    *  few minutes — the topic alone left them guessing what the call was for. */
   greetDaily: (name: string, topic: string, minutes: number) => string;
+  /** Opening cue when the call starts on the previous conversation instead (see
+   *  lib/recall): she greets, says what the last call was about, and asks the first
+   *  question straight away. The subject of the day is announced after the reprise, so
+   *  this cue must NOT mention it. */
+  greetRecall: (name: string, when: string, topic: string) => string;
+  /** The "# Reprise" block: the first two minutes of a call, spent on the previous one.
+   *  Built from lib/recall — `ago` phrases the gap, `ask` writes one line per question,
+   *  `nothing` stands in when the last call left no material to ask about, and `block`
+   *  assembles all of it with the rules for running it. */
+  recall: {
+    ago: (days: number) => string;
+    /** Introduces the last call's subjects. Same wording as `records.themes`, so the
+     *  reprise reads like the debrief the student already saw. */
+    themes: string;
+    block: (a: { when: string; topic: string; gist: string; questions: string[] }) => string;
+    ask: {
+      vocab: (q: { item: string; gloss?: string; example?: string }) => string;
+      grammar: (q: { item: string; answer: string; gloss?: string; note?: string }) => string;
+      phrase: (q: { item: string; wrong?: string; note?: string }) => string;
+    };
+    nothing: string;
+  };
   /** Silent stage directions injected mid-call. */
   notes: {
     materialPause: string; materialBack: string; oneMinute: string; timeUp: string; overtime: string;
