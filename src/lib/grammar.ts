@@ -2,7 +2,8 @@ import type { GrammarDrill, GrammarState, GrammarTopic, Memory, Settings } from 
 import { band, BANDS } from './cefr';
 import { compById, compLib, type CompItem } from './competencies';
 import { pack } from '../lang';
-import { todayISO } from './utils';
+import { sheetForComp } from './sheets';
+import { norm, todayISO } from './utils';
 
 /** Grammar taught outright.
  *
@@ -198,16 +199,70 @@ export function markCourseDone(mem: Memory, id: string, today = todayISO()): voi
 
 /* ---------- the queue ---------- */
 
+/** Whole-word matcher for one cell, built from its cheat-sheet keywords and its own label.
+ *  The same bounded matching lib/course uses to pull the learner's own mistakes into a
+ *  lesson: whole words only, keys of four letters or more — a four-letter key like "etre"
+ *  matched as a substring hits half the French sentences ever written. */
+export function cellMatcher(item: CompItem, lang?: string): (hay: string) => boolean {
+  const sheet = sheetForComp(item.id, item.label, lang);
+  const keys = [...(sheet?.match ?? []), item.label].map(norm).filter(k => k.length > 3);
+  if (!keys.length) return () => false;
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const res = keys.map(k => new RegExp('\\b' + esc(k) + '\\b'));
+  return hay => res.some(r => r.test(hay));
+}
+
+/** Corrections from this many recent calls count towards a cell's pressure. Enough to see
+ *  a fortnight of daily calls; old enough mistakes describe a learner who may be gone. */
+const PRESSURE_SESSIONS = 14;
+
+/** How hard the learner's own record leans on each grammar cell.
+ *
+ *  The matrix is not the only witness to a cell failing. The analysis also keeps tracked
+ *  weaknesses — «prépositions», worked thirty-one calls running and still persisting — and
+ *  a per-call correction log, and neither used to move the queue at all: a cell the matrix
+ *  happened never to observe sat behind freshly-grey cells while the calls corrected it
+ *  daily. Weaknesses weigh by how alive they are (persisting > new > improving; resolved
+ *  not at all), each correction on the concept adds one. */
+export function weaknessPressure(mem: Memory): Record<string, number> {
+  const out: Record<string, number> = {};
+  const sessions = (mem.sessions ?? []).slice(-PRESSURE_SESSIONS);
+  for (const item of compLib(mem.profile.target)) {
+    if (item.cat !== 'grammaire') continue;
+    const hits = cellMatcher(item, mem.profile.target);
+    let p = 0;
+    for (const w of mem.weaknesses ?? []) {
+      if (w.status === 'resolved' || !hits(norm(w.label))) continue;
+      p += w.status === 'persisting' ? 3 : w.status === 'new' ? 2 : 1;
+    }
+    for (const s of sessions) {
+      for (const c of s.analysis?.corrections ?? []) {
+        if (c.category === 'grammar' && hits(norm(c.cefr_topic))) p++;
+      }
+    }
+    if (p) out[item.id] = p;
+  }
+  return out;
+}
+
 /** How badly one cell wants teaching. Lower sorts first.
  *
  *  Failed outright beats mixed beats never-observed beats demonstrated, and inside each of
  *  those the lower band comes first: a learner who cannot manage the passé composé is not
  *  served by a lesson on the subjunctive, however loudly the subjunctive is failing. This
- *  is the same foundations-before-frontier rule the tutor's silent probes follow. */
-function score(item: CompItem, mem: Memory): number {
+ *  is the same foundations-before-frontier rule the tutor's silent probes follow.
+ *
+ *  Pressure from the learner's own record can promote a cell: a documented persisting
+ *  weakness is failure as surely as a red matrix cell, and a couple of corrections are at
+ *  least a mixed showing. Within the same standing and band, the heavier-pressed cell
+ *  comes first. */
+function score(item: CompItem, mem: Memory, pressure: Record<string, number>): number {
   const st = mem.comp?.[item.id]?.status;
-  const rank = st === 'ko' ? 0 : st === 'partial' ? 1 : st === undefined ? 2 : 3;
-  return rank * 10 + BANDS.indexOf(item.band);
+  let rank = st === 'ko' ? 0 : st === 'partial' ? 1 : st === undefined ? 2 : 3;
+  const p = pressure[item.id] ?? 0;
+  if (p >= 3) rank = 0;
+  else if (p >= 1) rank = Math.min(rank, 1);
+  return rank * 100 + BANDS.indexOf(item.band) * 10 + Math.max(0, 9 - p);
 }
 
 /** Grammar cells that are candidates at all: this language's grammar, at or below the
@@ -238,7 +293,9 @@ export function grammarQueue(mem: Memory): CompItem[] {
     const c = byId.get(id);
     if (c) { picked.push(c); byId.delete(id); }
   }
-  const rest = [...byId.values()].sort((a, b) => score(a, mem) - score(b, mem) || a.id.localeCompare(b.id));
+  const pressure = weaknessPressure(mem);
+  const rest = [...byId.values()].sort((a, b) =>
+    score(a, mem, pressure) - score(b, mem, pressure) || a.id.localeCompare(b.id));
   return [...picked, ...rest];
 }
 

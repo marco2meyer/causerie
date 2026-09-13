@@ -114,7 +114,12 @@ const ui: UIStrings = {
     start: 'Parlare', stopEarly: 'Ho finito', recording: 'Ti ascolto…', transcribing: 'Trascrizione…',
     results: 'Il tuo ritmo', mots: 'parole', wpm: 'parole/min',
     failMic: 'Microfono non disponibile.', later: 'Più tardi',
-    praiseUp: 'Più veloce a ogni giro. È lo scopo.', praiseFlat: 'Bene. La velocità verrà ripetendo.'
+    praiseUp: 'Più veloce a ogni giro. È lo scopo.', praiseFlat: 'Bene. La velocità verrà ripetendo.',
+    pastTitle: 'Racconto al passato',
+    pastOffer: 'Una volta a settimana: racconta la tua giornata di ieri, al passato, tre volte, sempre più veloce.',
+    pastExplain: 'Racconta al passato: il passato prossimo per gli eventi, l’imperfetto per lo sfondo. Tre giri: 60, 45 e 30 secondi.',
+    pastTopic: 'Racconta la tua giornata di ieri, dalla mattina alla sera.',
+    pastDue: 'il racconto della settimana'
   },
   story: {
     title: 'Storia del giorno', sub: 'Due minuti di ascolto, scritti per te',

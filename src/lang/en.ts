@@ -114,7 +114,12 @@ const ui: UIStrings = {
     start: 'Speak', stopEarly: 'I’m done', recording: 'Listening…', transcribing: 'Transcribing…',
     results: 'Your pace', mots: 'words', wpm: 'words/min',
     failMic: 'Microphone unavailable.', later: 'Later',
-    praiseUp: 'Faster every round. That is the point.', praiseFlat: 'Good. Speed comes with repetition.'
+    praiseUp: 'Faster every round. That is the point.', praiseFlat: 'Good. Speed comes with repetition.',
+    pastTitle: 'Telling the past',
+    pastOffer: 'Once a week: tell yesterday, in the past, three times, faster each time.',
+    pastExplain: 'Tell it in the past: past simple for the events, past continuous for the backdrop. Three rounds: 60, 45, then 30 seconds.',
+    pastTopic: 'Tell your day yesterday, morning to night.',
+    pastDue: 'the week’s story'
   },
   story: {
     title: 'Story of the day', sub: 'Two minutes of listening, written for you',

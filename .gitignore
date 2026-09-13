@@ -29,5 +29,7 @@ ds-bundle/
 deno.lock
 
 # Rehearsal transcripts (scripts/rehearse.mjs): runs of a scripted student against the
-# voice model, kept for comparison, never part of the app.
-.rehearsals/
+# voice model, kept for comparison, never part of the app. No trailing slash: this is a
+# symlink into the iCloud vault on the machine that owns it (the checkout itself lives on
+# local disk), and `.rehearsals/` matches a directory but not a link to one.
+.rehearsals

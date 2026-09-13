@@ -20,6 +20,13 @@
  *   node scripts/causerie.mjs events [days]     the user event log (admin sees everyone)
  *   node scripts/causerie.mjs whoami            check the credentials work
  *
+ * With SUPABASE_SERVICE_KEY set (the companion already needs it), the database itself
+ * is readable directly — every table, past RLS, so treat the output accordingly:
+ *
+ *   node scripts/causerie.mjs tables            every table, with its row count
+ *   node scripts/causerie.mjs db <table> [q]    rows; q is a raw PostgREST query string,
+ *                                               e.g. 'status=eq.sent&order=created_at.desc&limit=20'
+ *
  * Every command prints JSON on stdout and nothing else, so it pipes into jq.
  */
 import { readFileSync } from 'node:fs';
@@ -80,6 +87,22 @@ async function rest(path, token) {
   });
   if (!r.ok) die('query failed (' + r.status + '): ' + (await r.text()).slice(0, 300));
   return r.json();
+}
+
+/** Direct reads with the service key — the whole database, no RLS. Read-only by
+ *  construction: only GET ever leaves here. */
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const needService = () => {
+  if (!SUPA_URL) die('Set SUPABASE_URL in .env.local (see .env.example).');
+  if (!SERVICE_KEY) die('Set SUPABASE_SERVICE_KEY in .env.local (Supabase → Settings → API → service_role).');
+};
+
+async function adminGet(path, headers = {}) {
+  const r = await fetch(SUPA_URL + '/rest/v1/' + path, {
+    headers: { apikey: SERVICE_KEY, authorization: 'Bearer ' + SERVICE_KEY, ...headers }
+  });
+  if (!r.ok) die('query failed (' + r.status + '): ' + (await r.text()).slice(0, 300));
+  return r;
 }
 
 /** The synced profile blob: not a table, a Netlify blob behind the access code. */
@@ -148,6 +171,31 @@ switch (cmd) {
       + '&order=created_at.desc&limit=5000', token));
     break;
   }
+  case 'tables': {
+    needService();
+    // PostgREST's OpenAPI root is the table catalogue; a HEAD with count=exact per table
+    // turns it into an inventory.
+    const spec = await (await adminGet('')).json();
+    const names = Object.keys(spec.definitions ?? {}).sort();
+    const rows = {};
+    for (const name of names) {
+      const r = await fetch(SUPA_URL + '/rest/v1/' + name + '?select=*', {
+        method: 'HEAD',
+        headers: { apikey: SERVICE_KEY, authorization: 'Bearer ' + SERVICE_KEY, prefer: 'count=exact', range: '0-0' }
+      });
+      rows[name] = Number((r.headers.get('content-range') ?? '/').split('/')[1]) || 0;
+    }
+    out(rows);
+    break;
+  }
+  case 'db': {
+    needService();
+    if (!arg) die('usage: causerie.mjs db <table> [postgrest-query]');
+    const q = process.argv[4] ?? '';
+    const query = /(^|&)limit=/.test(q) ? q : (q ? q + '&' : '') + 'limit=100';
+    out(await (await adminGet(arg + '?' + (query.includes('select=') ? query : 'select=*&' + query))).json());
+    break;
+  }
   default:
-    die('usage: causerie.mjs <whoami|memory|sessions|transcript|costs|events> [arg]');
+    die('usage: causerie.mjs <whoami|memory|sessions|transcript|costs|events|tables|db> [arg]');
 }

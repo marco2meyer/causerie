@@ -13,6 +13,7 @@ import { daysSkipped } from '../lib/month';
 import { beyondPlan, sessionsPerDay, sittingPlan } from '../lib/budget';
 import { buildSession } from '../lib/srs';
 import { drillCount, drillTally, grammarFocus, learningTopics } from '../lib/grammar';
+import { narrationDue, narrationUnlocked } from '../lib/narration';
 import { banksFor, cachedCourse, warm } from '../lib/course';
 import { compById } from '../lib/competencies';
 import { sheetsForCall, type CheatSheet } from '../lib/sheets';
@@ -170,6 +171,11 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
     return () => { live = false; };
   }, [warmKey]);
   const rs = peekRevState(); // interrupted session to resume, if any
+  // The weekly past-tense narration (lib/narration): unlocked by the grammar strand's
+  // past-tense modules, owed once a week, and switched off with the same setting as the
+  // plain retell — it is the same exercise, aimed.
+  const narration = mem.settings.retell !== false && narrationUnlocked(mem);
+  const narrationOwed = narration && narrationDue(mem);
   const levelKnown = !intro || mem.cefr.history.length > 0;
   const checkinDue = useMemo(() => dueCheckin(mem), [mem]);
   // Days rather than a score: a run that is live says how long it has been, a run that
@@ -286,6 +292,17 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
         </div>
       )}
 
+      {/* The week's récit, when it is owed: same shape as the check-in nudge — one line,
+          one button — because that is what a weekly appointment looks like on this screen. */}
+      {narrationOwed && !intro && (
+        <div class="card" style="margin-top:12px">
+          <div class="spread">
+            <div style="font-size:14px"><b>{S.flu.pastTitle}</b> · {S.flu.pastDue}</div>
+            <button class="btn primary" style="padding:9px 15px" onClick={() => go('narration')}>{S.flu.start}</button>
+          </div>
+        </div>
+      )}
+
       {intro && (
         <div class="row" style="margin-top:12px;flex-wrap:wrap">
           <span class="chip blue sm">{S.today.introChip(introN + 1)}</span>
@@ -374,6 +391,14 @@ export function Today({ mem, setMem, apiInfo, go, startCall, openCheckin, toast,
                 <div class="head"><span class="kicker">{S.flu.title}</span></div>
                 <p class="muted" style="font-size:13.5px;margin:0 0 4px;line-height:1.5">{S.flu.offer}</p>
                 <button class="btn ghost big" onClick={() => { setMoreOpen(false); go('retell'); }}><I.mic /> {S.flu.start}</button>
+              </div>
+            )}
+
+            {narration && (
+              <div class="daycard" style="margin-bottom:12px">
+                <div class="head"><span class="kicker">{S.flu.pastTitle}</span></div>
+                <p class="muted" style="font-size:13.5px;margin:0 0 4px;line-height:1.5">{S.flu.pastOffer}</p>
+                <button class="btn ghost big" onClick={() => { setMoreOpen(false); go('narration'); }}><I.mic /> {S.flu.start}</button>
               </div>
             )}
 

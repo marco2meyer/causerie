@@ -114,7 +114,12 @@ const ui: UIStrings = {
     start: 'Hablar', stopEarly: 'He terminado', recording: 'Te escucho…', transcribing: 'Transcribiendo…',
     results: 'Tu ritmo', mots: 'palabras', wpm: 'palabras/min',
     failMic: 'Micrófono no disponible.', later: 'Más tarde',
-    praiseUp: 'Más rápido en cada ronda. De eso se trata.', praiseFlat: 'Bien. La velocidad llegará repitiendo.'
+    praiseUp: 'Más rápido en cada ronda. De eso se trata.', praiseFlat: 'Bien. La velocidad llegará repitiendo.',
+    pastTitle: 'Relato en pasado',
+    pastOffer: 'Una vez por semana: cuenta tu día de ayer, en pasado, tres veces, cada vez más rápido.',
+    pastExplain: 'Cuenta en pasado: el indefinido para los hechos, el imperfecto para el decorado. Tres rondas: 60, 45 y 30 segundos.',
+    pastTopic: 'Cuenta tu día de ayer, de la mañana a la noche.',
+    pastDue: 'el relato de la semana'
   },
   story: {
     title: 'Historia del día', sub: 'Dos minutos de escucha, escritos para ti',

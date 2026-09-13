@@ -117,7 +117,12 @@ export const deUi: UIStrings = {
     start: 'Sprechen', stopEarly: 'Fertig', recording: 'Ich höre…', transcribing: 'Abschrift…',
     results: 'Dein Tempo', mots: 'Wörter', wpm: 'Wörter/Min',
     failMic: 'Mikrofon nicht verfügbar.', later: 'Später',
-    praiseUp: 'Jede Runde schneller. Genau darum geht es.', praiseFlat: 'Gut. Das Tempo kommt mit der Wiederholung.'
+    praiseUp: 'Jede Runde schneller. Genau darum geht es.', praiseFlat: 'Gut. Das Tempo kommt mit der Wiederholung.',
+    pastTitle: 'Erzählen in der Vergangenheit',
+    pastOffer: 'Einmal pro Woche: erzähl deinen gestrigen Tag in der Vergangenheit — dreimal, immer schneller.',
+    pastExplain: 'Erzähl in der Vergangenheit: passé composé für die Ereignisse, imparfait für die Kulisse. Drei Runden: 60, 45, dann 30 Sekunden.',
+    pastTopic: 'Raconte ta journée d’hier, du matin au soir.',
+    pastDue: 'die Erzählung der Woche'
   },
   story: {
     title: 'Geschichte des Tages', sub: 'Zwei Minuten Hören, für dich geschrieben',

@@ -4,7 +4,7 @@ import type { GrammarDrill, GrammarTopic, Memory } from '../../src/types';
 import {
   checkAnswer, drillCount, drillId, drillIndex, drillTally, grammarFocus, grammarQueue,
   grammarState, interleave, isDrillId, isMastered, learningTopics, markCourseDone, MASTERY,
-  pickDrills, recentAccuracy, recordDrill, settleMastery
+  pickDrills, recentAccuracy, recordDrill, settleMastery, weaknessPressure
 } from '../../src/lib/grammar';
 import { usableDrill, usableStep } from '../../src/lib/course';
 
@@ -23,6 +23,17 @@ const days = (spec: [string, number, number][]) => spec.map(([d, ok, ko]) => ({ 
 const drill = (topicId: string, n: number): GrammarDrill => ({
   topic: topicId, kind: 'gap', prompt: 'p' + n, text: '___ ' + n, cue: 'c' + n,
   options: [], answer: 'a' + n, explain: 'e'
+});
+
+/** A session carrying corrections, with only the fields pressure looks at filled in. */
+const sessionWith = (id: string, date: string, corrections: { cefr_topic: string; category: string }[]) => ({
+  id, date, topic: 't', source: 'causerie' as const, minutes: 8,
+  analysis: {
+    corrections: corrections.map((c, i) => ({
+      user_turn: i, original: 'x', besser: 'y', erklaerung: '', cloze_text: '',
+      category: c.category, cefr_topic: c.cefr_topic
+    }))
+  } as Memory['sessions'][number]['analysis']
 });
 
 describe('grammarQueue', () => {
@@ -74,6 +85,66 @@ describe('grammarQueue', () => {
     const q = grammarQueue(m).map(c => c.id);
     expect(q).not.toContain('g-a1-etre-avoir');
     expect(q).not.toContain('g-a1-articles');
+  });
+
+  it('a persisting weakness promotes its cell over untroubled cells of every band', () => {
+    // The scenario this exists for: the matrix never observed the cell (grey), but the
+    // weakness record has the ground failing call after call. Grey cells used to bury it.
+    const m = at(4);
+    m.weaknesses.push({
+      id: 'w1', label: 'Präpositionen bei Orten und festen Wendungen', cefr: 'A2',
+      status: 'persisting', firstSeen: '2026-08-17', lastSeen: '2026-09-12', timesWorked: 31, evidence: []
+    });
+    const q = grammarQueue(m).map(c => c.id);
+    expect(q.indexOf('g-a2-prepositions')).toBeLessThan(q.indexOf('g-a1-etre-avoir'));
+    expect(q.indexOf('g-a2-prepositions')).toBeLessThan(q.indexOf('g-b1-imparfait-pc'));
+  });
+
+  it('corrections alone lift a grey cell to a mixed standing, not a failing one', () => {
+    const m = at(4);
+    m.sessions.push(sessionWith('s1', '2026-09-01', [{ cefr_topic: 'Prépositions avec les pays', category: 'grammar' }]));
+    m.comp = { 'g-a1-negation': { status: 'ko', lastSeen: '2026-09-01' } };
+    const q = grammarQueue(m).map(c => c.id);
+    // One correction is pressure 1: ahead of the grey cells, still behind an outright ko.
+    expect(q.indexOf('g-a1-negation')).toBeLessThan(q.indexOf('g-a2-prepositions'));
+    expect(q.indexOf('g-a2-prepositions')).toBeLessThan(q.indexOf('g-a1-etre-avoir'));
+  });
+});
+
+describe('weaknessPressure', () => {
+  it('weighs weaknesses by status, in either support language, and counts corrections', () => {
+    const m = at(4);
+    m.weaknesses.push(
+      {
+        id: 'w1', label: 'Präpositionen bei Orten und festen Wendungen', cefr: 'A2',
+        status: 'persisting', firstSeen: '2026-08-17', lastSeen: '2026-09-12', timesWorked: 31, evidence: []
+      },
+      {
+        id: 'w2', label: 'Choix entre les pronoms relatifs « qui » et « que »', cefr: 'B1',
+        status: 'improving', firstSeen: '2026-08-25', lastSeen: '2026-09-08', timesWorked: 2, evidence: []
+      },
+      {
+        id: 'w3', label: 'Négation avec « rien »', cefr: 'A2',
+        status: 'resolved', firstSeen: '2026-08-26', lastSeen: '2026-09-12', timesWorked: 4, evidence: []
+      }
+    );
+    m.sessions.push(sessionWith('s1', '2026-09-01', [
+      { cefr_topic: 'Prépositions dans les expressions fixes', category: 'grammar' },
+      { cefr_topic: 'Prépositions dans les expressions fixes', category: 'vocab' }
+    ]));
+    const p = weaknessPressure(m);
+    expect(p['g-a2-prepositions']).toBe(4);   // persisting (3) + one grammar correction; vocab does not count
+    expect(p['g-b1-relatifs']).toBe(1);       // improving
+    expect(p['g-a1-negation']).toBeUndefined(); // resolved weaknesses put no pressure at all
+  });
+
+  it('lets old corrections age out of the window', () => {
+    const m = at(4);
+    m.sessions.push(sessionWith('old', '2026-08-01', [{ cefr_topic: 'Prépositions avec les pays', category: 'grammar' }]));
+    for (let i = 0; i < 14; i++) {
+      m.sessions.push({ id: 's' + i, date: '2026-08-0' + ((i % 9) + 1), topic: 't', source: 'causerie', minutes: 8 });
+    }
+    expect(weaknessPressure(m)['g-a2-prepositions']).toBeUndefined();
   });
 });
 

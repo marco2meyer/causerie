@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Memory } from '../types';
+import { compById } from '../lib/competencies';
+import { narrationCoachCell } from '../lib/narration';
 import { startRec, type Rec } from '../lib/recorder';
+import { sheetForComp } from '../lib/sheets';
 import { saveMem } from '../lib/storage';
 import { transcribeVerbatim } from '../lib/transcribe';
 import { deepClone, todayISO } from '../lib/utils';
 import { I } from '../components/icons';
-import { ui } from '../lang';
+import { pack, ui } from '../lang';
 
 interface Props {
   mem: Memory;
@@ -13,6 +16,9 @@ interface Props {
   topic: string;
   onExit: () => void;
   toast: (msg: string, err?: boolean) => void;
+  /** Past-tense narration (lib/narration): same 4/3/2 run, but the subject is yesterday
+   *  told in the past, and the intro leans on the past-tense fiche being drilled. */
+  past?: boolean;
 }
 
 /** 4/3/2 fluency retells (Nation): the same story three times against shrinking timers
@@ -22,8 +28,20 @@ const ROUNDS = [60, 45, 30];
 
 interface RoundResult { words: number; wpm: number; text: string }
 
-export function Retell({ mem, setMem, topic, onExit, toast }: Props) {
+export function Retell({ mem, setMem, topic, onExit, toast, past }: Props) {
   const S = ui();
+  // The subject is SPOKEN, so it comes from the target pack, not the UI language: a
+  // German-labelled app still asks for the récit in French.
+  const subject = past ? pack(mem.profile.target).ui.flu.pastTopic : topic;
+  const title = past ? S.flu.pastTitle : S.flu.title;
+  // The fiche of the past-tense concept the grammar strand is (or was last) working on:
+  // the run and the evening drills should pull in the same direction.
+  const coach = (() => {
+    if (!past) return [];
+    const id = narrationCoachCell(mem);
+    const item = id ? compById(mem.profile.target)[id] : undefined;
+    return item ? sheetForComp(item.id, item.label, mem.profile.target)?.core ?? [] : [];
+  })();
   const [phase, setPhase] = useState<'intro' | 'rec' | 'busy' | 'done'>('intro');
   const [round, setRound] = useState(0);
   const [left, setLeft] = useState(ROUNDS[0]);
@@ -68,7 +86,10 @@ export function Retell({ mem, setMem, topic, onExit, toast }: Props) {
       setPhase('intro');
     } else {
       const m = deepClone(mem);
-      m.fluency = [...(m.fluency ?? []), { date: todayISO(), topic, words: res.map(r => r.words), wpm: res.map(r => r.wpm) }].slice(-60);
+      m.fluency = [...(m.fluency ?? []), {
+        date: todayISO(), topic: subject, words: res.map(r => r.words), wpm: res.map(r => r.wpm),
+        ...(past ? { past: true } : {})
+      }].slice(-60);
       m.xp += 6;
       saveMem(m);
       setMem(m);
@@ -81,7 +102,7 @@ export function Retell({ mem, setMem, topic, onExit, toast }: Props) {
     return (
       <div class="rev-stage fadein">
         <div class="rev-card">
-          <div class="rev-type">{S.flu.title}</div>
+          <div class="rev-type">{title}</div>
           <div class="rev-front" style="font-size:19px">{S.flu.results}</div>
           <div class="flu-res">
             {results.map((r, i) => (
@@ -109,9 +130,14 @@ export function Retell({ mem, setMem, topic, onExit, toast }: Props) {
         <span class="tiny" style="width:52px;text-align:right">{round + 1}/3</span>
       </div>
       <div class="rev-card">
-        <div class="rev-type">{S.flu.title} · {S.flu.round(round + 1, ROUNDS[round])}</div>
-        <div class="rev-front" style="font-size:18px">{topic}</div>
-        {phase === 'intro' && round === 0 && <div class="rev-hint">{S.flu.explain}</div>}
+        <div class="rev-type">{title} · {S.flu.round(round + 1, ROUNDS[round])}</div>
+        <div class="rev-front" style="font-size:18px" lang={past ? mem.profile.target : undefined}>{subject}</div>
+        {phase === 'intro' && round === 0 && <div class="rev-hint">{past ? S.flu.pastExplain : S.flu.explain}</div>}
+        {phase === 'intro' && round === 0 && coach.length > 0 && (
+          <div class="rev-hint" lang={mem.profile.target} style="text-align:left">
+            {coach.map((l, i) => <div key={i}>· {l}</div>)}
+          </div>
+        )}
         {phase === 'rec' && (
           <div class="flu-timer" role="timer">
             <b>{left}</b><span class="tiny"> s</span>

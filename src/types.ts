@@ -583,8 +583,10 @@ export interface Memory {
   rank?: { level: number; settled: string; history?: JudgedWeek[] };
   /** Set when the getting-to-know-you phase is finished or skipped. */
   introDone?: boolean;
-  /** 4/3/2 fluency retells: one entry per run (words + wpm per shrinking round). */
-  fluency?: { date: string; topic: string; words: number[]; wpm: number[] }[];
+  /** 4/3/2 fluency retells: one entry per run (words + wpm per shrinking round).
+   *  `past` marks a past-tense narration run (lib/narration), which is what the weekly
+   *  cadence is counted from. */
+  fluency?: { date: string; topic: string; words: number[]; wpm: number[]; past?: boolean }[];
   /** User-edited tutor briefing template ({{placeholder}} syntax); unset = built-in default. */
   tutorTemplate?: string;
   sync?: { token: string; enabled: boolean };

@@ -4,7 +4,7 @@ import { pack } from '../lang';
 import type { CompItem } from './competencies';
 import { sheetForComp } from './sheets';
 import { activeProfile } from './profiles';
-import { checkAnswer } from './grammar';
+import { cellMatcher, checkAnswer } from './grammar';
 import { scrubHint } from './hints';
 import { norm, todayISO } from './utils';
 
@@ -255,16 +255,12 @@ const nativeName = (mem: Memory) => (mem.profile.native === 'en' ? 'English' : '
  *  and one that does not is a textbook page. Matched on the correction's own cefr_topic and
  *  on the cheat-sheet keywords for the cell, which is the same matching lib/sheets does. */
 export function ownErrors(mem: Memory, item: CompItem, n = 5): { wrong: string; better: string }[] {
-  const sheet = sheetForComp(item.id, item.label, mem.profile.target);
-  const keys = [...(sheet?.match ?? []), item.label].map(norm).filter(k => k.length > 3);
-  if (!keys.length) return [];
   // Whole words, and only against the correction's own CEFR topic — the label the analysis
-  // gave it. Matched as bare substrings against the explanation as well, a four-letter key
-  // like "etre" or "avoir" hits half the French sentences ever written, and the lesson then
-  // opens on three mistakes that have nothing to do with the concept it is teaching. This is
-  // the same bounded matching lib/sheets uses to pick a sheet for a call.
-  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const hits = (hay: string) => keys.some(k => new RegExp('\\b' + esc(k) + '\\b').test(hay));
+  // gave it. Matched as bare substrings against the explanation as well, a short key hits
+  // half the French sentences ever written, and the lesson then opens on three mistakes
+  // that have nothing to do with the concept it is teaching. The matcher lives in
+  // lib/grammar (cellMatcher), where the queue uses it to weigh the same record.
+  const hits = cellMatcher(item, mem.profile.target);
   const out: { wrong: string; better: string }[] = [];
   for (const s of [...(mem.sessions ?? [])].reverse()) {
     for (const c of s.analysis?.corrections ?? []) {

@@ -45,7 +45,7 @@ import { Help } from './views/Help';
 import { Tutorial } from './components/Tutorial';
 
 type View = 'boot' | 'onboard' | 'today' | 'call' | 'analyzing' | 'analyzeFail' | 'callstats' | 'review' | 'admin'
-  | 'revsession' | 'cards' | 'memory' | 'settings' | 'profiles' | 'checkin' | 'retell' | 'help' | 'pron' | 'grammar' | 'companion';
+  | 'revsession' | 'cards' | 'memory' | 'settings' | 'profiles' | 'checkin' | 'retell' | 'narration' | 'help' | 'pron' | 'grammar' | 'companion';
 
 /** A call waiting for its analysis. `id` is the record keepCall() already wrote, which the
  *  analysis fills in — a retry must not leave a second copy of the same conversation. */
@@ -527,12 +527,13 @@ export function App() {
       </div>
     );
   }
-  if (view === 'retell' && mem) {
+  if ((view === 'retell' || view === 'narration') && mem) {
     const lastToday = mem.sessions.filter(s => s.source === 'causerie' && s.date === todayISO()).slice(-1)[0];
     return (
       <div>
         <Toast t={toastS} onAction={() => setToastS(null)} />
-        <Retell mem={mem} setMem={setMem} topic={lastToday?.topic ?? ''} onExit={() => go('today')} toast={toast} />
+        <Retell mem={mem} setMem={setMem} topic={lastToday?.topic ?? ''} past={view === 'narration'}
+          onExit={() => go('today')} toast={toast} />
       </div>
     );
   }
